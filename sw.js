@@ -1,6 +1,6 @@
 // Keeps the app itself (page, icons, AI engine code) available offline.
 // The model files are saved separately by the AI engine in its own storage.
-const VERSION = 'local-ai-v2';
+const VERSION = 'local-ai-v3';
 const SHELL = ['./', './index.html', './manifest.json', './apple-touch-icon.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -57,5 +57,17 @@ self.addEventListener('fetch', (event) => {
       return putInCache(req, await fetch(req));
     })());
   }
-  // Everything else (model downloads) passes straight through; the engine caches those itself.
+  // Newer engines look for "tensor-cache.json"; older community model uploads only have
+  // "ndarray-cache.json" with the same contents. Fall back to it when the new name is missing.
+  if (url.hostname === 'huggingface.co' && url.pathname.endsWith('/tensor-cache.json')) {
+    event.respondWith((async () => {
+      const res = await fetch(req);
+      if (res.status !== 404) return res;
+      const alt = await fetch(req.url.replace(/tensor-cache\.json$/, 'ndarray-cache.json'), { mode: 'cors', credentials: 'omit' });
+      return alt.ok ? alt : res;
+    })());
+    return;
+  }
+
+  // Everything else (model downloads) passes straight through; the engines cache those themselves.
 });

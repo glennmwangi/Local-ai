@@ -97,7 +97,7 @@ button { cursor: pointer; }
   gap: 9px;
   min-height: 40px;
   min-width: 0;
-  max-width: calc(100% - 136px);
+  max-width: calc(100% - 178px);
   padding: 0 14px 0 13px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -455,6 +455,89 @@ button { cursor: pointer; }
 .switch input:checked + span::after { transform: translateX(20px); }
 .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* ---------- image studio ---------- */
+.studio {
+  position: fixed;
+  left: 0; right: 0;
+  top: var(--app-top);
+  height: var(--app-h);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  visibility: hidden;
+  transform: translateY(16px);
+  opacity: 0;
+  transition: opacity .2s ease, transform .2s ease, visibility 0s .2s;
+}
+.studio.open { visibility: visible; transform: none; opacity: 1; transition: opacity .2s ease, transform .2s ease; }
+.studio-bar { justify-content: space-between; }
+.studio-bar h2 { margin: 0; font-size: 17px; font-weight: 700; position: absolute; left: 50%; transform: translateX(-50%); }
+.studio-bar .btn { min-height: 40px; padding: 0 10px; }
+.back { display: inline-flex; align-items: center; gap: 2px; color: var(--accent) !important; font-weight: 600; }
+.studio-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 16px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+.studio-inner { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+#studioNotices { display: flex; flex-direction: column; gap: 8px; }
+#studioNotices:empty { display: none; }
+#studioNotices .notice { max-width: none; }
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--line) 55%, transparent) 0 10px, transparent 10px 20px),
+    var(--surface);
+  border: 1px solid var(--line);
+}
+.stage img, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage img[hidden] { display: none; }
+#maskCanvas { opacity: .5; touch-action: none; pointer-events: none; }
+.stage.painting #maskCanvas { pointer-events: auto; cursor: crosshair; }
+.stage-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); font-size: 15px; pointer-events: none; }
+.stage-empty[hidden] { display: none; }
+.stage-empty b { display: block; font-family: var(--prose); font-weight: 600; font-size: 22px; color: var(--ink); margin-bottom: 6px; }
+.stage-busy {
+  position: absolute; inset: 0;
+  display: none;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  font-weight: 700;
+  font-size: 16px;
+}
+.stage.busy .stage-busy { display: grid; }
+.stage-busy span { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.stage-busy span::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--signal); animation: pulse 1.1s ease-in-out infinite; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.row-btns[hidden] { display: none; }
+.pane { display: flex; flex-direction: column; gap: 12px; }
+.pane[hidden] { display: none; }
+.pane textarea {
+  width: 100%;
+  min-height: 84px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  font-size: 17px;
+  font-family: var(--ui);
+  resize: vertical;
+}
+.pane .label { font-weight: 700; font-size: 15px; }
+.pane .hint { color: var(--muted); font-size: 13.5px; margin: 0; }
+.big { min-height: 50px; font-size: 17px; border-radius: 14px; }
+.brushes { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.brushes .chips button { min-width: 44px; }
+.thumbs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.thumbs:empty { display: none; }
+.thumbs button { flex: none; width: 64px; height: 64px; padding: 0; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: var(--surface); }
+.thumbs button[aria-current="true"] { border-color: var(--accent); }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fineprint { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -470,6 +553,9 @@ button { cursor: pointer; }
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <div class="bar-actions">
+      <button id="openStudio" class="icon-btn" type="button" aria-label="Images">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.7"/><path d="m4 17 4.5-4.5 3.5 3.5 2.5-2.5L20 18"/></svg>
+      </button>
       <button id="speakBtn" class="icon-btn" type="button" aria-pressed="true" aria-label="Speak replies">
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path class="waves" d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.6a8 8 0 0 1 0 10.8"/><path class="slash" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
       </button>
@@ -612,6 +698,82 @@ button { cursor: pointer; }
   </div>
 </div>
 
+<section id="studio" class="studio" aria-labelledby="studioTitle" aria-hidden="true">
+  <header class="bar studio-bar">
+    <button class="btn quiet back" type="button" id="studioBack">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M11 3.5 5.5 9l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Chat
+    </button>
+    <h2 id="studioTitle" tabindex="-1">Images</h2>
+    <button class="btn quiet" type="button" id="unloadImages" hidden>Unload</button>
+  </header>
+  <div class="studio-body">
+    <div class="studio-inner">
+      <div id="studioNotices" aria-live="polite"></div>
+
+      <div class="stage" id="stage">
+        <img id="stageImg" alt="" hidden>
+        <canvas id="maskCanvas" width="512" height="512" aria-label="Paint over the part to change"></canvas>
+        <div class="stage-empty" id="stageEmpty"><div><b>Make or change a picture</b>Describe something new, or pick a photo and paint over the part you want changed.</div></div>
+        <div class="stage-busy" aria-live="polite"><span id="busyText">Drawing…</span></div>
+      </div>
+
+      <div class="row-btns" id="resultBtns" hidden>
+        <button class="btn primary" type="button" id="saveImg">Save</button>
+        <button class="btn" type="button" id="editResult">Change this</button>
+        <button class="btn" type="button" id="againImg">Try again</button>
+      </div>
+      <div class="thumbs" id="thumbs" aria-label="Recent pictures"></div>
+
+      <div class="seg two" role="group" aria-label="What do you want to do?" id="modeSeg">
+        <button type="button" data-mode="create" aria-pressed="true">Create</button>
+        <button type="button" data-mode="change" aria-pressed="false">Change a photo</button>
+      </div>
+
+      <div class="pane" id="createPane">
+        <label class="label" for="imgPrompt">Describe the picture</label>
+        <textarea id="imgPrompt" placeholder="A red fox curled up in fresh snow at sunset, soft light"></textarea>
+        <p class="hint">Say what's in it, then the style: photo, watercolor, 3D render, pixel art.</p>
+        <button class="btn primary big" type="button" id="createBtn">Create</button>
+      </div>
+
+      <div class="pane" id="changePane" hidden>
+        <div class="row-btns">
+          <button class="btn" type="button" id="pickPhoto">Choose a photo</button>
+          <input type="file" id="photoInput" accept="image/*" hidden>
+        </div>
+        <div class="brushes">
+          <span class="label" id="brushLabel">Brush</span>
+          <div class="chips" role="group" aria-labelledby="brushLabel" id="brushSizes">
+            <button type="button" data-size="14">S</button>
+            <button type="button" data-size="28" aria-pressed="true">M</button>
+            <button type="button" data-size="48">L</button>
+          </div>
+          <button class="btn quiet" type="button" id="clearMask">Clear paint</button>
+        </div>
+        <p class="hint" id="paintHint">Paint over the part you want changed. Paint nothing to restyle the whole picture.</p>
+        <label class="label" for="editPrompt">What should it become?</label>
+        <textarea id="editPrompt" placeholder="A red leather jacket"></textarea>
+        <div>
+          <label class="label" for="strength">How much to change</label>
+          <input type="range" id="strength" min="0.2" max="1" step="0.05" value="0.75" style="width:100%;accent-color:var(--accent)">
+          <div class="range-ends"><span>A little</span><span>Completely</span></div>
+        </div>
+        <button class="btn primary big" type="button" id="changeBtn">Change it</button>
+      </div>
+
+      <div class="setting last" style="padding-top:0">
+        <span class="label" id="qualLabel">Quality</span>
+        <div class="seg two" role="group" aria-labelledby="qualLabel" id="qualSeg">
+          <button type="button" data-q="fast" aria-pressed="true">Fast</button>
+          <button type="button" data-q="better" aria-pressed="false">Better</button>
+        </div>
+        <p class="hint">Better takes about twice as long and adds detail.</p>
+      </div>
+      <p class="fineprint">Pictures are 512 × 512 and made on this iPhone with SD-Turbo, which is free for personal, non-commercial use. The app forgets them when it closes, so save the ones you like.</p>
+    </div>
+  </div>
+</section>
+
 <script type="module">
 const LIB_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
 const TF_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
@@ -631,10 +793,18 @@ const CURATED = [
   { group: 'large', id: 'Qwen2.5-3B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 3B', note: 'Strong at facts and step-by-step answers.' },
   { group: 'large', id: 'Phi-3.5-mini-instruct-q4f16_1-MLC-1k', name: 'Phi 3.5 mini', note: 'Good at reasoning. Remembers less of the chat.' },
   { group: 'large', id: 'Qwen3-4B-q4f16_1-MLC', name: 'Qwen 3 4B', note: 'The smartest here. Newest Pro iPhones only, and it may crash.' },
+  // Community builds with refusals removed. They reuse the engine code of the model they're based on.
+  { group: 'open', id: 'Llama-3.2-3B-Instruct-abliterated-q4f16_1-MLC', name: 'Llama 3.2 3B Uncensored', note: 'Llama 3.2 3B with its refusals removed ("abliterated"). Otherwise the same model.', tag: 'Uncensored',
+    community: { url: 'https://huggingface.co/kdjunkit2/Llama-3.2-3B-Instruct-abliterated-q4f16_1-MLC', base: 'Llama-3.2-3B-Instruct-q4f16_1-MLC' } },
+  { group: 'open', id: 'Dolphin3.0-Llama3.2-3B-q4f16_1-MLC', name: 'Dolphin 3 (3B)', note: 'A popular uncensored model that sticks closely to your instructions and persona.', tag: 'Uncensored',
+    community: { url: 'https://huggingface.co/huggingkot/Dolphin3.0-Llama3.2-3B-q4f16_1-MLC', base: 'Llama-3.2-3B-Instruct-q4f16_1-MLC' } },
+  { group: 'open', id: 'Dolphin3.0-Qwen2.5-1.5B-q4f16_1-MLC', name: 'Dolphin 3 (1.5B)', note: 'Smaller, faster uncensored model.', tag: 'Uncensored',
+    community: { url: 'https://huggingface.co/huggingkot/Dolphin3.0-Qwen2.5-1.5B-q4f16_1-MLC', base: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC' } },
 ];
 const GROUPS = {
   small: { title: 'Runs on most iPhones', text: 'Under 1.5 GB of memory. Quick to download and fast to reply.' },
   large: { title: 'Smarter, for recent Pro iPhones', text: 'These need 2 to 3 GB of free memory, which usually means an iPhone 15 Pro or newer. If the app restarts while loading one, pick a smaller model.' },
+  open: { title: 'Uncensored', text: 'Community versions with the usual refusals removed. They answer more freely but aren’t any smarter, and can still be confidently wrong. Volunteers made these, so one may fail to load.' },
 };
 
 const PRESETS = {
@@ -808,8 +978,10 @@ function noticeEl({ kind = '', title, text, actions = [], details, progress }) {
 let flashTimer = 0;
 function flash(text, ms = 4500) {
   clearTimeout(flashTimer);
-  setNotice('flash', noticeEl({ text }));
-  flashTimer = setTimeout(() => setNotice('flash', null), ms);
+  const inStudio = document.getElementById('studio')?.classList.contains('open');
+  const put = inStudio ? (n) => studioNotice('flash', n) : (n) => setNotice('flash', n);
+  put(noticeEl({ text }));
+  flashTimer = setTimeout(() => put(null), ms);
 }
 
 /* ---------------- speaking (text to speech) ---------------- */
@@ -926,6 +1098,14 @@ function showLevel(level) {
   const shape = [0.55, 0.85, 1, 0.8, 0.5];
   bars.forEach((b, i) => { b.style.transform = `scaleY(${Math.max(0.15, Math.min(1, level * shape[i] * (0.8 + Math.random() * 0.4)))})`; });
 }
+let tfPromise = null;
+function getTF() {
+  if (!tfPromise) {
+    tfPromise = import(TF_URL).then((tf) => { tf.env.allowLocalModels = false; return tf; });
+    tfPromise.catch(() => { tfPromise = null; });
+  }
+  return tfPromise;
+}
 function ensureASR() {
   const key = STT_MODELS[settings.stt] || STT_MODELS.fast;
   if (stt.asr && stt.asrKey === key) return Promise.resolve(stt.asr);
@@ -933,8 +1113,7 @@ function ensureASR() {
   stt.loadingKey = key;
   const files = {};
   stt.loading = (async () => {
-    const tf = await import(TF_URL);
-    tf.env.allowLocalModels = false;
+    const tf = await getTF();
     const asr = await tf.pipeline('automatic-speech-recognition', key, {
       device: 'wasm',
       dtype: { encoder_model: 'fp32', decoder_model_merged: 'q8' },
@@ -1112,11 +1291,21 @@ async function onRecorded(mime) {
 
 function sendFromVoice(text) {
   if (!state.loadedId) {
+    if (state.resumeId && !state.loadingId) { resumeChat(text, { voice: true }); return; }
     input.value = text; autoGrow(); updateChrome();
     if (!state.loadingId) openSheet('sheetModels');
     return;
   }
   send(text, { voice: true });
+}
+
+// The chat model was put away to make room for the image model: bring it back, then send.
+let pendingSend = null;
+async function resumeChat(text, opts = {}) {
+  pendingSend = { text, opts };
+  const id = state.resumeId;
+  await releaseImageModel();
+  loadModel(id);
 }
 
 /* ---------------- header chip & composer ---------------- */
@@ -1131,6 +1320,8 @@ function updateChrome() {
   } else if (state.loadedId) {
     st = state.generating ? 'busy' : 'ready';
     label = prettyName(state.loadedId);
+  } else if (state.resumeId) {
+    label = 'Chat paused';
   } else if (!state.gpuOK && state.gpuChecked) {
     st = 'error'; label = 'Not supported here';
   }
@@ -1140,7 +1331,7 @@ function updateChrome() {
   chip.setAttribute('aria-label', st === 'ready' || st === 'busy' ? `Model: ${label}. Change model` : label);
 
   const name = personaName();
-  input.placeholder = state.loadedId ? (name ? `Message ${name}` : 'Message') : state.loadingId ? 'Getting the model ready…' : 'Choose a model to start';
+  input.placeholder = state.loadedId ? (name ? `Message ${name}` : 'Message') : state.loadingId ? 'Getting the model ready…' : state.resumeId ? 'Message (the chat reloads first)' : 'Choose a model to start';
   const send = $('#send');
   if (state.generating) {
     send.disabled = false;
@@ -1165,6 +1356,12 @@ scroller.addEventListener('scroll', () => {
 const toEnd = (force) => { if (force || stick) scroller.scrollTop = scroller.scrollHeight; };
 
 function heroEl() {
+  if (!state.loadedId && !state.loadingId && state.resumeId) {
+    return el('div', { class: 'ready-state' },
+      el('h2', { text: 'Chat is paused' }),
+      el('p', { text: `The image model is using the memory right now. Send a message and ${prettyName(state.resumeId)} reloads in a few seconds.` }),
+    );
+  }
   if (state.loadedId || state.loadingId) {
     const name = personaName();
     return el('div', { class: 'ready-state' },
@@ -1325,7 +1522,7 @@ function renderModels() {
     return;
   }
   const entries = modelEntries();
-  const groups = [['small', GROUPS.small], ['large', GROUPS.large], ['other', { title: 'Every other model', text: 'Most of these are too big for a phone.' }]];
+  const groups = [['small', GROUPS.small], ['large', GROUPS.large], ['open', GROUPS.open], ['other', { title: 'Every other model', text: 'Most of these are too big for a phone.' }]];
   for (const [key, g] of groups) {
     const rows = entries.filter((m) => m.group === key);
     if (!rows.length) continue;
@@ -1426,6 +1623,8 @@ function explainLoadError(err) {
 async function loadModel(id) {
   if (!state.lib) return;
   if (state.generating) stopGenerating();
+  if (img.s || img.loading) await releaseImageModel();
+  state.resumeId = null;
   const seq = ++state.loadSeq;
   state.loadingId = id;
   state.loadedId = null;
@@ -1449,9 +1648,15 @@ async function loadModel(id) {
     state.cached[id] = true;
     store.set('model', id);
     try { await navigator.storage?.persist?.(); } catch {}
+    if (pendingSend) {
+      const p = pendingSend;
+      pendingSend = null;
+      setTimeout(() => send(p.text, p.opts), 0);
+    }
   } catch (err) {
     if (seq !== state.loadSeq) return;
     console.error(err);
+    if (pendingSend) { input.value = pendingSend.text; autoGrow(); pendingSend = null; }
     setNotice('loadError', noticeEl({
       kind: 'bad',
       title: `Couldn’t load ${prettyName(id)}`,
@@ -1646,8 +1851,13 @@ $('#composer').addEventListener('submit', (e) => {
   e.preventDefault();
   if (state.generating) { stopGenerating(); return; }
   unlockTTS();
-  if (!state.loadedId) { if (!state.loadingId) openSheet('sheetModels'); return; }
   const text = input.value;
+  if (!state.loadedId) {
+    if (state.loadingId) return;
+    if (state.resumeId && text.trim()) { input.value = ''; autoGrow(); resumeChat(text); return; }
+    openSheet('sheetModels');
+    return;
+  }
   if (!text.trim()) return;
   input.value = '';
   autoGrow();
@@ -1737,6 +1947,583 @@ function sampleLine() {
   return name ? `Hi, I'm ${name}. This is how I sound.` : 'Hi there. This is how I sound.';
 }
 
+/* ---------------- image studio: SD-Turbo on the iPhone's GPU ---------------- */
+const ORT_DIST = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
+const SD_BASE = 'https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/';
+const SD_CACHE = 'image-models-v1'; // not prefixed "local-ai-", so app updates never delete it
+const VAE_SCALE = 0.18215;
+const SD_PARTS = [
+  { key: 'text_encoder', path: 'text_encoder/model.onnx', mb: 680, opt: { freeDimensionOverrides: { batch_size: 1 } }, out: { last_hidden_state: 'gpu-buffer' } },
+  { key: 'unet', path: 'unet/model.onnx', mb: 1730, opt: { freeDimensionOverrides: { batch_size: 1, num_channels: 4, height: 64, width: 64, sequence_length: 77 } } },
+  { key: 'vae_decoder', path: 'vae_decoder/model.onnx', mb: 95, opt: { freeDimensionOverrides: { batch_size: 1, num_channels_latent: 4, height_latent: 64, width_latent: 64 } } },
+  { key: 'vae_encoder', path: 'vae_encoder/model.onnx', mb: 68, opt: { freeDimensionOverrides: { batch_size: 1 } } },
+];
+const SD_TOTAL_MB = SD_PARTS.reduce((a, p) => a + p.mb, 0);
+const img = {
+  ort: null, s: null, loading: false, progress: null, tok: null, cached: null,
+  current: null, history: [], source: null, mode: 'create', brush: 28, busy: false, quality: 'fast', last: null,
+};
+
+// Noise schedule of Stable Diffusion 2.1 (scaled linear betas); sigma(999) = 14.6146.
+const ALPHAS = (() => {
+  const N = 1000, a = Math.sqrt(0.00085), b = Math.sqrt(0.012), ac = new Float64Array(N);
+  let p = 1;
+  for (let i = 0; i < N; i++) { const beta = (a + (b - a) * i / (N - 1)) ** 2; p *= 1 - beta; ac[i] = p; }
+  return ac;
+})();
+const sigmaAt = (t) => Math.sqrt((1 - ALPHAS[t]) / ALPHAS[t]);
+
+function makeRng(seed) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randn(n, rng) {
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i += 2) {
+    const u = Math.max(rng(), 1e-12), v = rng(), r = Math.sqrt(-2 * Math.log(u));
+    out[i] = r * Math.cos(2 * Math.PI * v);
+    if (i + 1 < n) out[i + 1] = r * Math.sin(2 * Math.PI * v);
+  }
+  return out;
+}
+function halfToFloat(h) {
+  const s = (h & 0x8000) ? -1 : 1, e = (h >> 10) & 0x1f, f = h & 0x3ff;
+  if (e === 0) return s * 2 ** -14 * (f / 1024);
+  if (e === 31) return f ? NaN : s * Infinity;
+  return s * 2 ** (e - 15) * (1 + f / 1024);
+}
+const _f = new Float32Array(1), _u = new Uint32Array(_f.buffer);
+function floatToHalf(v) {
+  _f[0] = v;
+  const x = _u[0], sign = (x >>> 16) & 0x8000;
+  let e = ((x >>> 23) & 0xff) - 127 + 15;
+  let m = x & 0x7fffff;
+  if (e <= 0) { if (e < -10) return sign; m = (m | 0x800000) >> (1 - e); return sign | ((m + 0x1000) >> 13); }
+  if (e >= 31) return sign | 0x7c00;
+  return sign | ((e << 10) + ((m + 0x1000) >> 13));
+}
+function toF32(t) {
+  const d = t.data;
+  if (d instanceof Float32Array) return d;
+  if (typeof Float16Array !== 'undefined' && d instanceof Float16Array) return Float32Array.from(d);
+  if (d instanceof Uint16Array) { const o = new Float32Array(d.length); for (let i = 0; i < d.length; i++) o[i] = halfToFloat(d[i]); return o; }
+  return Float32Array.from(d);
+}
+window.__localAI = { sigmaAt, floatToHalf, halfToFloat };
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.crossOrigin = 'anonymous';
+    s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src));
+    document.head.append(s);
+  });
+}
+async function getOrt() {
+  if (img.ort) return img.ort;
+  if (!window.ort) await loadScript(ORT_DIST + 'ort.webgpu.min.js');
+  const ort = window.ort;
+  ort.env.wasm.wasmPaths = ORT_DIST;
+  ort.env.wasm.numThreads = 1;
+  img.ort = ort;
+  return ort;
+}
+
+async function sdCachedParts() {
+  try {
+    const c = await caches.open(SD_CACHE);
+    return await Promise.all(SD_PARTS.map(async (p) => !!(await c.match(SD_BASE + p.path))));
+  } catch { return SD_PARTS.map(() => false); }
+}
+// Stream a model file into the browser's cache (so it's only downloaded once), counting bytes as they arrive.
+async function fetchPart(part, onBytes) {
+  const url = SD_BASE + part.path;
+  const cache = await caches.open(SD_CACHE);
+  let hit = await cache.match(url);
+  if (!hit) {
+    const resp = await fetch(url);
+    if (!resp.ok || !resp.body) throw new Error(`Download failed (HTTP ${resp.status})`);
+    let loaded = 0;
+    const counted = resp.body.pipeThrough(new TransformStream({
+      transform(chunk, ctrl) { loaded += chunk.byteLength; onBytes(loaded); ctrl.enqueue(chunk); },
+    }));
+    await cache.put(url, new Response(counted, { headers: { 'content-type': 'application/octet-stream' } }));
+    hit = await cache.match(url);
+    if (!hit) throw new Error('The model could not be saved on this iPhone');
+  }
+  return hit.arrayBuffer();
+}
+
+function studioNotice(key, node) {
+  const box = $('#studioNotices');
+  const old = box.querySelector(`[data-key="${key}"]`);
+  if (old) old.remove();
+  if (node) { node.dataset.key = key; box.append(node); }
+}
+
+async function loadImageModel() {
+  if (img.s || img.loading) return;
+  img.loading = true;
+  img.progress = { phase: 'start', value: 0 };
+  studioNotice('error', null);
+  renderStudio();
+  // Free memory: the chat model is put away while pictures are being made.
+  if (state.generating) stopGenerating();
+  if (state.loadingId) { const id = state.loadingId; await cancelLoad(); state.resumeId = id; }
+  if (state.loadedId) {
+    state.resumeId = state.loadedId;
+    try { await state.engine.unload(); } catch {}
+    state.loadedId = null;
+  }
+  updateChrome();
+  if (!state.messages.length) renderThread();
+  store.set('pending', { phase: 'images', at: Date.now() });
+  keepAwake(true);
+  const sessions = {};
+  try {
+    const ort = await getOrt();
+    const cached = await sdCachedParts();
+    const needMB = SD_PARTS.reduce((a, p, i) => a + (cached[i] ? 0 : p.mb), 0);
+    let doneBytes = 0;
+    for (const [i, part] of SD_PARTS.entries()) {
+      if (!cached[i]) {
+        let buf = await fetchPart(part, (b) => {
+          img.progress = { phase: 'download', value: Math.min(0.99, (doneBytes + b) / (needMB * 1048576)), mb: Math.round((doneBytes + b) / 1048576), totalMB: needMB };
+          renderProgress();
+        });
+        doneBytes += buf.byteLength;
+        img.progress = { phase: 'prepare', value: i / SD_PARTS.length };
+        renderProgress();
+        sessions[part.key] = await createSession(ort, buf, part);
+        buf = null;
+      } else {
+        img.progress = { phase: 'prepare', value: i / SD_PARTS.length };
+        renderProgress();
+        let buf = await fetchPart(part, () => {});
+        sessions[part.key] = await createSession(ort, buf, part);
+        buf = null;
+      }
+    }
+    img.s = sessions;
+    img.cached = true;
+    try { await navigator.storage?.persist?.(); } catch {}
+  } catch (e) {
+    console.error(e);
+    for (const s of Object.values(sessions)) { try { await s.release(); } catch {} }
+    const m = String(e?.message || e);
+    studioNotice('error', noticeEl({
+      kind: 'bad',
+      title: 'Couldn’t load the image model',
+      text: /quota|space|storage/i.test(m) ? 'There isn’t enough free storage. The image model needs about 2.6 GB.'
+        : /download|fetch|network|load failed/i.test(m) ? 'The download stopped. Tap the button to try again; finished parts are kept.'
+        : 'The iPhone’s graphics chip couldn’t set it up. Close other apps and try again.',
+      details: m,
+    }));
+  } finally {
+    img.loading = false;
+    img.progress = null;
+    store.del('pending');
+    keepAwake(false);
+    renderStudio();
+  }
+}
+async function createSession(ort, buf, part) {
+  const opt = {
+    executionProviders: ['webgpu'],
+    enableMemPattern: false,
+    enableCpuMemArena: false,
+    extra: { session: { disable_prepacking: '1', use_device_allocator_for_initializers: '1', use_ort_model_bytes_directly: '1', use_ort_model_bytes_for_initializers: '1' } },
+    ...part.opt,
+  };
+  if (part.out) opt.preferredOutputLocation = part.out;
+  return ort.InferenceSession.create(buf, opt);
+}
+async function releaseImageModel() {
+  const s = img.s;
+  img.s = null;
+  if (s) for (const k of Object.keys(s)) { try { await s[k].release(); } catch {} }
+  if ($('#studio').classList.contains('open')) renderStudio();
+}
+
+// --- the diffusion steps ---
+async function clipTokens(text) {
+  if (!img.tok) {
+    const tf = await getTF();
+    img.tok = await tf.AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch16');
+    img.tok.pad_token_id = 0;
+  }
+  const { input_ids } = await img.tok(text, { padding: true, max_length: 77, truncation: true, return_tensor: false });
+  const ids = Array.from(Array.isArray(input_ids[0]) ? input_ids[0] : input_ids, Number).slice(0, 77);
+  while (ids.length < 77) ids.push(0);
+  return Int32Array.from(ids);
+}
+async function encodePrompt(text) {
+  const ids = await clipTokens(text);
+  const out = await img.s.text_encoder.run({ input_ids: new img.ort.Tensor('int32', ids, [1, 77]) });
+  return out.last_hidden_state ?? Object.values(out)[0];
+}
+async function runFloat(sess, data, dims) {
+  const name = sess.inputNames?.[0];
+  try {
+    return await sess.run({ [name]: new img.ort.Tensor('float32', data, dims) });
+  } catch (e) {
+    if (!/float16/i.test(String(e?.message || e))) throw e;
+    const h = new Uint16Array(data.length);
+    for (let i = 0; i < data.length; i++) h[i] = floatToHalf(data[i]);
+    return await sess.run({ [name]: new img.ort.Tensor('float16', h, dims) });
+  }
+}
+// One UNet call: returns the model's guess of the clean latent image at noise level t.
+async function predictX0(x, t, hidden) {
+  const s = sigmaAt(t), k = 1 / Math.sqrt(s * s + 1);
+  const inp = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) inp[i] = x[i] * k;
+  const out = await img.s.unet.run({
+    sample: new img.ort.Tensor('float32', inp, [1, 4, 64, 64]),
+    timestep: new img.ort.Tensor('int64', BigInt64Array.from([BigInt(t)]), [1]),
+    encoder_hidden_states: hidden,
+  });
+  const eps = toF32(out.out_sample ?? Object.values(out)[0]);
+  const x0 = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) x0[i] = x[i] - s * eps[i];
+  return x0;
+}
+async function decodeLatents(x0) {
+  const lat = new Float32Array(x0.length);
+  for (let i = 0; i < x0.length; i++) lat[i] = x0[i] / VAE_SCALE;
+  const out = await runFloat(img.s.vae_decoder, lat, [1, 4, 64, 64]);
+  return toF32(out.sample ?? Object.values(out)[0]);
+}
+async function encodeImage(chw) {
+  const out = await runFloat(img.s.vae_encoder, chw, [1, 3, 512, 512]);
+  const d = toF32(out.latent_sample ?? Object.values(out)[0]);
+  const lat = new Float32Array(4 * 64 * 64); // first 4 channels: the latent (or its mean)
+  for (let i = 0; i < lat.length; i++) lat[i] = d[i] * VAE_SCALE;
+  return lat;
+}
+const renoise = (x0, t, noise) => { const s = sigmaAt(t), x = new Float32Array(x0.length); for (let i = 0; i < x.length; i++) x[i] = x0[i] + s * noise[i]; return x; };
+const blendLatent = (x0, keep, m) => { for (let i = 0; i < x0.length; i++) { const a = m[i % 4096]; x0[i] = a * x0[i] + (1 - a) * keep[i]; } };
+
+// --- pixels and masks ---
+const makeCanvas = (w = 512, h = 512) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+function canvasToCHW(cv) {
+  const d = cv.getContext('2d').getImageData(0, 0, 512, 512).data, P = 512 * 512, out = new Float32Array(3 * P);
+  for (let i = 0; i < P; i++) { out[i] = d[i * 4] / 127.5 - 1; out[P + i] = d[i * 4 + 1] / 127.5 - 1; out[2 * P + i] = d[i * 4 + 2] / 127.5 - 1; }
+  return out;
+}
+function chwToCanvas(chw, base, alpha) {
+  const cv = makeCanvas(), ctx = cv.getContext('2d'), im = ctx.createImageData(512, 512), P = 512 * 512;
+  const bd = base && alpha ? base.getContext('2d').getImageData(0, 0, 512, 512).data : null;
+  for (let i = 0; i < P; i++) {
+    let r = (chw[i] + 1) * 127.5, g = (chw[P + i] + 1) * 127.5, b = (chw[2 * P + i] + 1) * 127.5;
+    if (bd) { const a = alpha[i]; r = bd[i * 4] * (1 - a) + r * a; g = bd[i * 4 + 1] * (1 - a) + g * a; b = bd[i * 4 + 2] * (1 - a) + b * a; }
+    im.data[i * 4] = r; im.data[i * 4 + 1] = g; im.data[i * 4 + 2] = b; im.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+  return cv;
+}
+function boxBlur(a, w, h, r) {
+  const tmp = new Float32Array(a.length), out = new Float32Array(a.length), n = 2 * r + 1;
+  for (let y = 0; y < h; y++) {
+    let acc = 0;
+    for (let x = -r; x <= r; x++) acc += a[y * w + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[y * w + x] = acc / n;
+      acc += a[y * w + Math.min(w - 1, x + r + 1)] - a[y * w + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = acc / n;
+      acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+  return out;
+}
+function paintedMask() {
+  const d = $('#maskCanvas').getContext('2d').getImageData(0, 0, 512, 512).data;
+  const a = new Float32Array(512 * 512);
+  let any = false;
+  for (let i = 0; i < a.length; i++) { a[i] = d[i * 4 + 3] > 8 ? 1 : 0; if (a[i]) any = true; }
+  return any ? a : null;
+}
+function pixelMask(a) { const b = boxBlur(a, 512, 512, 6); for (let i = 0; i < b.length; i++) b[i] = Math.min(1, b[i] * 2); return b; }
+function latentMask(a) {
+  const m = new Float32Array(64 * 64);
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    let s = 0;
+    for (let dy = 0; dy < 8; dy++) for (let dx = 0; dx < 8; dx++) s += a[(y * 8 + dy) * 512 + x * 8 + dx];
+    m[y * 64 + x] = Math.min(1, (s / 64) * 3);
+  }
+  const b = boxBlur(m, 64, 64, 1);
+  for (let i = 0; i < b.length; i++) b[i] = Math.min(1, b[i] * 1.5);
+  return b;
+}
+
+// --- making pictures ---
+function setBusy(text) {
+  img.busy = !!text;
+  $('#stage').classList.toggle('busy', img.busy);
+  if (text) $('#busyText').textContent = text;
+  renderStudioButtons();
+}
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+
+async function makePicture(job) {
+  if (img.busy) return;
+  if (!img.s) { await loadImageModel(); if (!img.s) return; }
+  studioNotice('error', null);
+  store.set('pending', { phase: 'images', at: Date.now() });
+  const seed = job.seed ?? Math.floor(Math.random() * 2 ** 31);
+  const rng = makeRng(seed);
+  const better = img.quality === 'better';
+  let hidden = null;
+  try {
+    setBusy('Reading your description…');
+    await nextFrame();
+    hidden = await encodePrompt(job.prompt);
+    let cv;
+    if (job.kind === 'create') {
+      setBusy('Drawing…');
+      await nextFrame();
+      const T = 999;
+      let x0 = await predictX0(renoise(new Float32Array(16384), T, randn(16384, rng)), T, hidden);
+      if (better) x0 = await predictX0(renoise(x0, 499, randn(16384, rng)), 499, hidden);
+      setBusy('Finishing…');
+      await nextFrame();
+      cv = chwToCanvas(await decodeLatents(x0));
+    } else {
+      setBusy('Looking at your photo…');
+      await nextFrame();
+      const src = job.source;
+      const keep = await encodeImage(canvasToCHW(src));
+      const painted = job.mask;
+      const mLat = painted ? latentMask(painted) : null;
+      const t = Math.max(60, Math.min(999, Math.round(job.strength * 999)));
+      setBusy('Changing it…');
+      await nextFrame();
+      let x0 = await predictX0(renoise(keep, t, randn(16384, rng)), t, hidden);
+      if (mLat) blendLatent(x0, keep, mLat);
+      if (better) {
+        const t2 = Math.max(40, Math.round(t * 0.5));
+        x0 = await predictX0(renoise(x0, t2, randn(16384, rng)), t2, hidden);
+        if (mLat) blendLatent(x0, keep, mLat);
+      }
+      setBusy('Finishing…');
+      await nextFrame();
+      const chw = await decodeLatents(x0);
+      cv = painted ? chwToCanvas(chw, src, pixelMask(painted)) : chwToCanvas(chw);
+    }
+    img.last = { ...job, seed: undefined };
+    await showResult(cv);
+    if (job.kind === 'change') setSource(cv); // keep editing from the newest version
+  } catch (e) {
+    console.error(e);
+    studioNotice('error', noticeEl({ kind: 'bad', title: 'That picture didn’t work', text: 'Something went wrong on the graphics chip. Try again, or close other apps to free memory.', details: String(e?.message || e) }));
+  } finally {
+    try { hidden?.dispose?.(); } catch {}
+    store.del('pending');
+    setBusy(null);
+  }
+}
+
+async function showResult(cv) {
+  const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+  const item = { canvas: cv, blob, url: URL.createObjectURL(blob) };
+  img.history.unshift(item);
+  for (const old of img.history.splice(12)) URL.revokeObjectURL(old.url);
+  img.current = item;
+  showOnStage(item);
+  renderThumbs();
+}
+function showOnStage(item) {
+  const im = $('#stageImg');
+  if (item) { im.src = item.url; im.hidden = false; } else { im.removeAttribute('src'); im.hidden = true; }
+  $('#stageEmpty').hidden = !!item;
+  renderStudioButtons();
+}
+function renderThumbs() {
+  const box = $('#thumbs');
+  box.replaceChildren(...img.history.map((h, i) => el('button', {
+    type: 'button', 'aria-label': `Picture ${i + 1}`, 'aria-current': String(h === img.current),
+    onclick: () => { img.current = h; if (img.mode === 'change') setSource(h.canvas); else showOnStage(h); renderThumbs(); },
+  }, el('img', { src: h.url, alt: '' }))));
+}
+
+function clearMask() { $('#maskCanvas').getContext('2d').clearRect(0, 0, 512, 512); }
+function setSource(cv) {
+  img.source = cv;
+  clearMask();
+  const blobUrl = cv.toDataURL('image/jpeg', 0.92);
+  const im = $('#stageImg');
+  im.src = blobUrl; im.hidden = false;
+  $('#stageEmpty').hidden = true;
+  renderStudioButtons();
+}
+async function photoToCanvas(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const pic = new Image();
+    pic.src = url;
+    await pic.decode();
+    const s = Math.min(pic.naturalWidth, pic.naturalHeight);
+    const cv = makeCanvas();
+    cv.getContext('2d').drawImage(pic, (pic.naturalWidth - s) / 2, (pic.naturalHeight - s) / 2, s, s, 0, 0, 512, 512);
+    return cv;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function setMode(mode) {
+  img.mode = mode;
+  document.querySelectorAll('#modeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  $('#createPane').hidden = mode !== 'create';
+  $('#changePane').hidden = mode !== 'change';
+  $('#stageEmpty').firstElementChild.innerHTML = mode === 'change'
+    ? '<b>Choose a photo</b>Then paint over the part you want changed and describe what it should become.'
+    : '<b>Make or change a picture</b>Describe something new, or pick a photo and paint over the part you want changed.';
+  if (mode === 'change') {
+    if (!img.source && img.current) img.source = img.current.canvas;
+    if (img.source) setSource(img.source); else showOnStage(null);
+  } else { clearMask(); showOnStage(img.current); }
+  renderStudioButtons();
+}
+
+function renderStudioButtons() {
+  const ready = !img.loading && !img.busy;
+  const hasModel = !!img.s;
+  const label = hasModel ? null : img.cached ? 'Load the image model' : `Download the image model (${(SD_TOTAL_MB / 1024).toFixed(1)} GB)`;
+  const createBtn = $('#createBtn'), changeBtn = $('#changeBtn');
+  createBtn.textContent = label || 'Create';
+  changeBtn.textContent = label || 'Change it';
+  createBtn.disabled = !ready || (hasModel && !$('#imgPrompt').value.trim());
+  changeBtn.disabled = !ready || (hasModel && (!img.source || !$('#editPrompt').value.trim()));
+  $('#resultBtns').hidden = !img.current || (img.mode === 'change' && img.current.canvas !== img.source);
+  $('#editResult').hidden = img.mode === 'change' && img.current?.canvas === img.source;
+  $('#againImg').disabled = !ready || !img.last;
+  $('#unloadImages').hidden = !hasModel || img.busy;
+  $('#stage').classList.toggle('painting', img.mode === 'change' && !!img.source && !img.busy);
+}
+
+function renderProgress() {
+  const p = img.progress;
+  if (!p) { studioNotice('progress', null); return; }
+  const title = p.phase === 'download' ? 'Downloading the image model' : 'Getting the image model ready';
+  const text = p.phase === 'download'
+    ? `${p.mb} of about ${p.totalMB} MB. Keep this screen open; it only downloads once. The chat model is paused to make room.`
+    : 'Setting up the graphics chip. This takes about half a minute.';
+  studioNotice('progress', noticeEl({ kind: 'warn', title, text, progress: p.value || 0 }));
+}
+
+async function renderStudio() {
+  if (img.cached === null) img.cached = (await sdCachedParts()).every(Boolean);
+  renderProgress();
+  if (!img.s && !img.loading && !img.cached) {
+    studioNotice('intro', noticeEl({
+      title: 'Pictures are made on this iPhone',
+      text: `The first time, the image model downloads once (about ${(SD_TOTAL_MB / 1024).toFixed(1)} GB, best on Wi-Fi). While it's loaded, the chat model is paused to free memory and comes back when you send a message.`,
+    }));
+  } else studioNotice('intro', null);
+  renderStudioButtons();
+}
+
+function openStudio() {
+  if (!state.gpuOK) { flash('Making pictures needs WebGPU, which this browser doesn’t have.'); return; }
+  stopSpeaking();
+  const st = $('#studio');
+  st.classList.add('open');
+  st.setAttribute('aria-hidden', 'false');
+  renderStudio();
+  setTimeout(() => $('#studioTitle').focus({ preventScroll: true }), 50);
+}
+function closeStudio() {
+  const st = $('#studio');
+  st.classList.remove('open');
+  st.setAttribute('aria-hidden', 'true');
+  updateChrome();
+  if (!state.messages.length) renderThread();
+}
+
+// painting the mask
+(() => {
+  const cv = $('#maskCanvas');
+  const ctx = cv.getContext('2d');
+  let last = null;
+  const pt = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 512, (e.clientY - r.top) / r.height * 512]; };
+  const dot = ([x, y]) => { ctx.fillStyle = '#E0A526'; ctx.beginPath(); ctx.arc(x, y, img.brush, 0, Math.PI * 2); ctx.fill(); };
+  cv.addEventListener('pointerdown', (e) => {
+    if (!$('#stage').classList.contains('painting')) return;
+    e.preventDefault();
+    cv.setPointerCapture?.(e.pointerId);
+    last = pt(e);
+    dot(last);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!last) return;
+    const p = pt(e);
+    ctx.strokeStyle = '#E0A526'; ctx.lineWidth = img.brush * 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(...last); ctx.lineTo(...p); ctx.stroke();
+    last = p;
+  });
+  const end = () => { last = null; };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+})();
+
+$('#openStudio').addEventListener('click', openStudio);
+$('#studioBack').addEventListener('click', closeStudio);
+$('#unloadImages').addEventListener('click', async () => { await releaseImageModel(); flash('The image model is unloaded. Send a chat message to bring the chat back.'); });
+$('#modeSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode); });
+$('#qualSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-q]');
+  if (!b) return;
+  img.quality = b.dataset.q;
+  document.querySelectorAll('#qualSeg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+});
+$('#brushSizes').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-size]');
+  if (!b) return;
+  img.brush = +b.dataset.size;
+  document.querySelectorAll('#brushSizes button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+});
+$('#clearMask').addEventListener('click', clearMask);
+$('#imgPrompt').addEventListener('input', renderStudioButtons);
+$('#editPrompt').addEventListener('input', renderStudioButtons);
+$('#pickPhoto').addEventListener('click', () => $('#photoInput').click());
+$('#photoInput').addEventListener('change', async (e) => {
+  const f = e.target.files?.[0];
+  e.target.value = '';
+  if (!f) return;
+  try { setSource(await photoToCanvas(f)); setMode('change'); }
+  catch { studioNotice('error', noticeEl({ kind: 'bad', title: 'Couldn’t open that photo', text: 'Try a different photo, or a screenshot of it.' })); }
+});
+$('#createBtn').addEventListener('click', () => {
+  if (!img.s) { loadImageModel(); return; }
+  makePicture({ kind: 'create', prompt: $('#imgPrompt').value.trim() });
+});
+$('#changeBtn').addEventListener('click', () => {
+  if (!img.s) { loadImageModel(); return; }
+  if (!img.source) { flash('Choose a photo first.'); return; }
+  makePicture({ kind: 'change', prompt: $('#editPrompt').value.trim(), source: img.source, mask: paintedMask(), strength: +$('#strength').value });
+});
+$('#againImg').addEventListener('click', () => { if (img.last) makePicture(img.last); });
+$('#editResult').addEventListener('click', () => { if (!img.current) return; setSource(img.current.canvas); setMode('change'); $('#editPrompt').focus(); });
+$('#saveImg').addEventListener('click', async () => {
+  const cur = img.current;
+  if (!cur) return;
+  const file = new File([cur.blob], `local-ai-${Date.now()}.png`, { type: 'image/png' });
+  try {
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  flash('Press and hold the picture, then tap Save to Photos.');
+});
+
 /* ---------------- start-up ---------------- */
 function registerSW() {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -1745,6 +2532,15 @@ function registerSW() {
 }
 
 function showCrashNotice(p) {
+  if (p.phase === 'images') {
+    setNotice('crash', noticeEl({
+      kind: 'warn',
+      title: 'The page restarted last time',
+      text: 'iOS reloaded this page while it was working on a picture. The image model needs about 3 GB of free memory: close other apps, use Fast quality, and try again.',
+      actions: [{ label: 'Dismiss', kind: 'quiet', onClick: () => setNotice('crash', null) }],
+    }));
+    return;
+  }
   const what = p.phase === 'answering' ? 'was answering with' : 'was loading';
   setNotice('crash', noticeEl({
     kind: 'warn',
@@ -1819,8 +2615,17 @@ async function boot() {
     }));
     return;
   }
-  state.appConfig = { ...state.lib.prebuiltAppConfig };
-  for (const m of state.appConfig.model_list || []) state.byId[m.model_id] = m;
+  state.appConfig = { ...state.lib.prebuiltAppConfig, model_list: [...(state.lib.prebuiltAppConfig.model_list || [])] };
+  for (const m of state.appConfig.model_list) state.byId[m.model_id] = m;
+  // Add the community models, borrowing the engine code of the model each one is based on.
+  for (const c of CURATED) {
+    if (!c.community || state.byId[c.id]) continue;
+    const base = state.byId[c.community.base];
+    if (!base) continue;
+    const rec = { ...base, model: c.community.url, model_id: c.id };
+    state.appConfig.model_list.push(rec);
+    state.byId[c.id] = rec;
+  }
 
   const last = store.get('model', null);
   await refreshCached(last ? [...modelEntries().map((m) => m.id), last] : undefined);
