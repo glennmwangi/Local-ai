@@ -1,0 +1,14 @@
+{
+  "name": "Local AI",
+  "short_name": "Local AI",
+  "description": "A private AI chat that runs entirely on your iPhone.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EDF0EE",
+  "theme_color": "#EDF0EE",
+  "icons": [
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

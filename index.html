@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Local AI</title>
+<meta name="description" content="A private AI chat that runs entirely on your iPhone.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Local AI">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EDF0EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12191B" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="manifest" href="manifest.json">
+<style>
+:root {
+  --bg: #EDF0EE;
+  --surface: #F8FAF8;
+  --ink: #18242A;
+  --muted: #5E6C70;
+  --line: #D3DAD7;
+  --accent: #2E6B57;
+  --accent-ink: #FFFFFF;
+  --signal: #D9971C;
+  --danger: #B3412F;
+  --bubble: #24343D;
+  --bubble-ink: #F3F6F4;
+  --code-bg: #E2E8E5;
+  --backdrop: rgba(24, 36, 42, .38);
+
+  --ui: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --prose: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --app-h: 100dvh;
+  --app-top: 0px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12191B;
+    --surface: #1A2326;
+    --ink: #E6ECEA;
+    --muted: #8E9C9F;
+    --line: #2A3639;
+    --accent: #6BB896;
+    --accent-ink: #0E1A16;
+    --signal: #F0B840;
+    --danger: #E7826F;
+    --bubble: #2C3E46;
+    --bubble-ink: #EEF3F1;
+    --code-bg: #0D1315;
+    --backdrop: rgba(0, 0, 0, .55);
+  }
+}
+html.kb { --safe-b: 0px; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
+body {
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 17px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+button, textarea, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#app {
+  position: fixed;
+  left: 0; right: 0;
+  top: var(--app-top);
+  height: var(--app-h);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- header ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px 12px;
+  background: var(--bg);
+}
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  min-width: 0;
+  max-width: calc(100% - 136px);
+  padding: 0 14px 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  isolation: isolate;
+}
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: calc(var(--p, 0) * 1%);
+  background: color-mix(in srgb, var(--signal) 22%, transparent);
+  z-index: -1;
+  transition: width .3s ease;
+}
+.chip-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip svg { flex: none; opacity: .55; }
+.led {
+  flex: none;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: .5;
+}
+[data-state="ready"] .led {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+[data-state="loading"] .led,
+[data-state="busy"] .led {
+  background: var(--signal);
+  opacity: 1;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+[data-state="error"] .led { background: var(--danger); opacity: 1; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal) 55%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--signal) 0%, transparent); }
+}
+.bar-actions { margin-left: auto; display: flex; gap: 2px; }
+.icon-btn {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+}
+.icon-btn:active { background: var(--line); }
+.icon-btn:disabled { opacity: .35; }
+#speakBtn .waves { transition: opacity .2s; }
+#speakBtn[aria-pressed="false"] .waves { opacity: 0; }
+#speakBtn[aria-pressed="false"] .slash { opacity: 1; }
+#speakBtn .slash { opacity: 0; }
+#speakBtn.speaking { color: var(--accent); }
+#speakBtn.speaking .waves { animation: waves 1s ease-in-out infinite; }
+@keyframes waves { 50% { opacity: .35; } }
+
+/* ---------- notices ---------- */
+#notices { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+#notices:empty { display: none; }
+.notice {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 15px;
+}
+.notice.warn { border-left: 4px solid var(--signal); }
+.notice.bad { border-left: 4px solid var(--danger); }
+.notice h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; }
+.notice p { margin: 0; color: var(--muted); }
+.notice .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.notice details { margin-top: 8px; color: var(--muted); font-size: 13px; }
+.notice details pre { white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 12px; margin: 6px 0 0; }
+.track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 12px 0 8px; }
+.fill { height: 100%; width: 0; background: var(--signal); border-radius: 3px; transition: width .3s ease; }
+.btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.btn:active { filter: brightness(.94); }
+
+/* ---------- thread ---------- */
+#scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+#thread {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.msg.user { align-self: flex-end; max-width: 84%; }
+.bubble {
+  background: var(--bubble);
+  color: var(--bubble-ink);
+  padding: 10px 15px;
+  border-radius: 20px 20px 6px 20px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 16.5px;
+}
+.msg.user .via { text-align: right; font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.msg.ai { max-width: 100%; }
+.prose {
+  font-family: var(--prose);
+  font-size: 17.5px;
+  line-height: 1.58;
+  word-wrap: break-word;
+}
+.prose > :first-child { margin-top: 0; }
+.prose > :last-child { margin-bottom: 0; }
+.prose p { margin: 0 0 .75em; }
+.prose h1, .prose h2, .prose h3, .prose h4 { font-family: var(--ui); font-size: 17px; font-weight: 700; margin: 1.1em 0 .35em; }
+.prose ul, .prose ol { margin: 0 0 .75em; padding-left: 1.4em; }
+.prose li { margin: .2em 0; }
+.prose code { font-family: var(--mono); font-size: .82em; background: var(--code-bg); padding: .1em .35em; border-radius: 5px; }
+.prose pre {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.5;
+  background: var(--code-bg);
+  padding: 12px 14px;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 0 0 .75em;
+}
+.prose pre code { background: none; padding: 0; font-size: inherit; }
+.prose a { color: var(--accent); }
+.prose blockquote { margin: 0 0 .75em; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.think { margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+.think summary { cursor: pointer; font-weight: 600; list-style: none; }
+.think summary::-webkit-details-marker { display: none; }
+.think summary::before { content: "▸ "; }
+.think[open] summary::before { content: "▾ "; }
+.think div { white-space: pre-wrap; margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--line); font-family: var(--prose); }
+.waiting { display: inline-flex; gap: 5px; padding: 8px 0; }
+.waiting i { width: 7px; height: 7px; border-radius: 50%; background: var(--signal); animation: blink 1.2s infinite ease-in-out; }
+.waiting i:nth-child(2) { animation-delay: .15s; }
+.waiting i:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.msg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-top: 8px; margin-left: -8px; color: var(--muted); font-size: 13px; }
+.msg-actions button { border: 0; background: none; color: var(--muted); padding: 6px 8px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.msg-actions button:active { background: var(--line); }
+.msg-actions .speed { margin-left: 4px; }
+.msg-error { margin-top: 8px; color: var(--danger); font-size: 14px; font-family: var(--ui); }
+
+/* ---------- empty states ---------- */
+.hero { padding: 6vh 2px 0; }
+.hero h1 {
+  font-family: var(--prose);
+  font-weight: 600;
+  font-size: clamp(30px, 8.6vw, 40px);
+  line-height: 1.12;
+  letter-spacing: -.01em;
+  margin: 0 0 14px;
+  max-width: 15ch;
+}
+.hero p { color: var(--muted); margin: 0 0 22px; max-width: 34ch; }
+.facts { list-style: none; padding: 0; margin: 0 0 28px; display: grid; gap: 12px; font-size: 15.5px; }
+.facts li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: baseline; }
+.facts li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); transform: translateY(-1px); }
+.facts b { font-weight: 700; }
+.hero .btn.primary { min-height: 50px; padding: 0 24px; font-size: 17px; border-radius: 14px; }
+.ready-state { padding-top: 5vh; }
+.ready-state h2 { font-family: var(--prose); font-weight: 600; font-size: 28px; margin: 0 0 6px; }
+.ready-state p { color: var(--muted); margin: 0 0 18px; }
+.suggestions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.suggestions button {
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 15.5px;
+}
+
+/* ---------- composer ---------- */
+#composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px calc(var(--safe-b) + 8px);
+  background: var(--bg);
+}
+.field {
+  flex: 1;
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+}
+#input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-size: 17px;
+  line-height: 1.35;
+  padding: 7px 0 7px 4px;
+  max-height: 140px;
+  min-height: 36px;
+}
+#input::placeholder { color: var(--muted); }
+.round {
+  flex: none;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 0;
+  display: grid; place-items: center;
+}
+#send { background: var(--accent); color: var(--accent-ink); }
+#send:disabled { background: var(--line); color: var(--muted); }
+#send.stop { background: var(--ink); color: var(--bg); }
+#mic { background: transparent; color: var(--ink); }
+#mic:disabled { opacity: .35; }
+.field[data-mic="listening"] #mic { background: var(--danger); color: #fff; }
+.field[data-mic="listening"], .field[data-mic="transcribing"], .field[data-mic="starting"] { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+#voiceStatus {
+  display: none;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding-left: 4px;
+  font-size: 16px;
+  color: var(--muted);
+}
+.field[data-mic]:not([data-mic="idle"]) #input { display: none; }
+.field[data-mic]:not([data-mic="idle"]) #voiceStatus { display: flex; }
+.meter { flex: none; display: flex; align-items: center; gap: 3px; height: 22px; }
+.meter i { width: 3px; height: 100%; border-radius: 2px; background: var(--danger); transform: scaleY(.15); transition: transform .08s linear; }
+.field:not([data-mic="listening"]) .meter { display: none; }
+
+/* ---------- sheets ---------- */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s .26s;
+}
+.sheet.open { visibility: visible; pointer-events: auto; transition: none; }
+.sheet .scrim { position: absolute; inset: 0; background: var(--backdrop); opacity: 0; transition: opacity .26s ease; }
+.sheet.open .scrim { opacity: 1; }
+.panel {
+  position: relative;
+  max-height: 90%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  transform: translateY(100%);
+  transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.sheet.open .panel { transform: none; }
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 6px 20px;
+}
+.panel-head h2 { margin: 0; font-size: 20px; font-weight: 700; }
+.panel-body { overflow-y: auto; padding: 0 20px 22px; -webkit-overflow-scrolling: touch; }
+.panel-body > p.lead { color: var(--muted); margin: 0 0 6px; font-size: 15px; }
+.group-head { margin: 22px 0 2px; }
+.group-head h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.group-head p { margin: 2px 0 8px; color: var(--muted); font-size: 14px; }
+.models { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.model {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.model-main { text-align: left; border: 0; background: none; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.model-name { font-weight: 700; font-size: 16.5px; }
+.model-tag { font-size: 13px; font-weight: 700; color: var(--accent); margin-left: 6px; white-space: nowrap; }
+.model-note { font-size: 14.5px; color: var(--ink); opacity: .82; }
+.model-meta { font-size: 13px; color: var(--muted); }
+.model-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.model-status { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.model-status.on { color: var(--accent); }
+.model-status.saved { color: var(--ink); }
+.model-del { border: 0; background: none; color: var(--danger); font-size: 13px; font-weight: 600; padding: 4px 0; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0 6px; font-size: 15px; }
+.storage { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+.section-title { margin: 18px 0 2px; font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .01em; }
+.section-title:first-child { margin-top: 4px; }
+.setting { padding: 12px 0 14px; border-bottom: 1px solid var(--line); }
+.setting.last { border-bottom: 0; }
+.setting > label, .setting .label { display: block; font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+.setting .hint { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; }
+.setting textarea, .setting input[type="text"], .setting select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  font-size: 16px;
+}
+.setting textarea { min-height: 112px; resize: vertical; }
+.setting textarea.short { min-height: 76px; }
+.setting select { min-height: 44px; -webkit-appearance: none; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
+.setting input[type="range"] { width: 100%; accent-color: var(--accent); }
+.range-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
+.seg button { border: 0; background: transparent; border-radius: 9px; min-height: 36px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 7px 14px; font-size: 15px; font-weight: 600; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.inline-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inline-row .label { margin: 0; }
+.about { color: var(--muted); font-size: 14px; margin-top: 14px; }
+.switch { position: relative; width: 50px; height: 30px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: background .2s; pointer-events: none; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(20px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="app" data-state="none">
+  <header class="bar">
+    <button id="chip" class="chip" type="button" aria-haspopup="dialog" aria-controls="sheetModels">
+      <span class="led" aria-hidden="true"></span>
+      <span class="chip-label" id="chipLabel">Choose a model</span>
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="bar-actions">
+      <button id="speakBtn" class="icon-btn" type="button" aria-pressed="true" aria-label="Speak replies">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path class="waves" d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.6a8 8 0 0 1 0 10.8"/><path class="slash" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+      </button>
+      <button id="newChat" class="icon-btn" type="button" aria-label="New chat">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V12"/><path d="M17.6 3.6a1.9 1.9 0 0 1 2.8 2.8L12.5 14.3 9 15l.7-3.5z"/></svg>
+      </button>
+      <button id="openSettings" class="icon-btn" type="button" aria-label="Settings" aria-haspopup="dialog" aria-controls="sheetSettings">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="notices" aria-live="polite"></div>
+
+  <main id="scroll">
+    <div id="thread"></div>
+  </main>
+
+  <form id="composer" autocomplete="off">
+    <div class="field" id="field" data-mic="idle">
+      <button id="mic" class="round" type="button" aria-label="Talk">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+      </button>
+      <label for="input" class="sr">Message</label>
+      <textarea id="input" rows="1" placeholder="Message" enterkeyhint="send"></textarea>
+      <div id="voiceStatus" role="status">
+        <span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span id="voiceText">Listening…</span>
+      </div>
+      <button id="send" class="round" type="submit" aria-label="Send" disabled>
+        <svg id="sendIcon" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 14.5V3.5M4 8.5 9 3.5l5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </form>
+</div>
+
+<div id="sheetModels" class="sheet" role="dialog" aria-modal="true" aria-labelledby="modelsTitle">
+  <div class="scrim" data-close></div>
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="modelsTitle" tabindex="-1">Models</h2>
+      <button class="btn quiet" type="button" data-close>Done</button>
+    </div>
+    <div class="panel-body">
+      <p class="lead">Each model downloads once and then stays on this iPhone. Bigger models give better answers but need more memory.</p>
+      <div id="modelList"></div>
+      <div class="toggle-row">
+        <span id="showAllLabel">Show every model</span>
+        <label class="switch"><input type="checkbox" id="showAll" aria-labelledby="showAllLabel"><span></span></label>
+      </div>
+      <div class="storage" id="storageInfo"></div>
+    </div>
+  </div>
+</div>
+
+<div id="sheetSettings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="scrim" data-close></div>
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="settingsTitle" tabindex="-1">Settings</h2>
+      <button class="btn quiet" type="button" data-close>Done</button>
+    </div>
+    <div class="panel-body">
+      <h3 class="section-title">Personality</h3>
+      <div class="setting">
+        <span class="label" id="presetLabel">Start from</span>
+        <div class="chips" role="group" aria-labelledby="presetLabel" id="presets"></div>
+      </div>
+      <div class="setting">
+        <label for="pName">Name</label>
+        <input type="text" id="pName" placeholder="Leave empty for no name" maxlength="40" autocapitalize="words">
+      </div>
+      <div class="setting">
+        <label for="pDesc">Who they are</label>
+        <textarea id="pDesc"></textarea>
+        <p class="hint">Describe the character in a few sentences: their mood, what they care about, how they treat you.</p>
+      </div>
+      <div class="setting">
+        <label for="pLines">Things they might say</label>
+        <textarea id="pLines" class="short" placeholder="One line per row"></textarea>
+        <p class="hint">A couple of example lines teach the tone better than any description.</p>
+      </div>
+
+      <h3 class="section-title">Voice</h3>
+      <div class="setting">
+        <div class="inline-row">
+          <span class="label" id="speakLabel">Speak replies out loud</span>
+          <label class="switch"><input type="checkbox" id="speakToggle" aria-labelledby="speakLabel"><span></span></label>
+        </div>
+        <p class="hint">Replies to things you say with the microphone are always spoken.</p>
+      </div>
+      <div class="setting">
+        <label for="voiceSel">Voice</label>
+        <select id="voiceSel"></select>
+        <p class="hint" id="voiceHint">For a far more natural voice, download one in the iPhone’s Settings &gt; Accessibility &gt; Spoken Content &gt; Voices &gt; English. Ava, Zoe and Allison come in Premium versions. Then reopen this app and pick it here.</p>
+      </div>
+      <div class="setting">
+        <label for="rate">Speed</label>
+        <input type="range" id="rate" min="0.7" max="1.4" step="0.05">
+        <div class="range-ends"><span>Slower</span><span>Faster</span></div>
+      </div>
+      <div class="setting">
+        <label for="pitch">Pitch</label>
+        <input type="range" id="pitch" min="0.7" max="1.4" step="0.05">
+        <div class="range-ends"><span>Lower</span><span>Higher</span></div>
+        <div class="row" style="margin-top:12px"><button class="btn" type="button" id="testVoice">Test the voice</button></div>
+      </div>
+      <div class="setting">
+        <span class="label" id="sttLabel">Understanding your voice</span>
+        <div class="seg two" role="group" aria-labelledby="sttLabel" id="sttSeg">
+          <button type="button" data-stt="fast">Faster</button>
+          <button type="button" data-stt="accurate">More accurate</button>
+        </div>
+        <p class="hint">Speech is turned into text on this iPhone. The first time you tap the microphone it downloads a small speech model (about 40 MB for Faster, 110 MB for More accurate).</p>
+      </div>
+
+      <h3 class="section-title">Replies</h3>
+      <div class="setting">
+        <label for="temp">Creativity</label>
+        <input type="range" id="temp" min="0" max="1.2" step="0.1">
+        <div class="range-ends"><span>Precise</span><span>Creative</span></div>
+      </div>
+      <div class="setting">
+        <span class="label" id="lenLabel">Reply length</span>
+        <div class="seg" role="group" aria-labelledby="lenLabel" id="lenSeg">
+          <button type="button" data-len="short">Short</button>
+          <button type="button" data-len="medium">Medium</button>
+          <button type="button" data-len="long">Long</button>
+        </div>
+      </div>
+      <div class="setting last">
+        <div class="inline-row">
+          <span class="label" id="thinkLabel">Let Qwen 3 models think first</span>
+          <label class="switch"><input type="checkbox" id="thinkToggle" aria-labelledby="thinkLabel"><span></span></label>
+        </div>
+        <p class="hint">Thinking gives better answers to hard questions but makes every reply slower.</p>
+      </div>
+      <p class="about">The model runs on your iPhone's graphics chip through WebGPU, using the open-source WebLLM engine. Speech recognition uses Whisper through Transformers.js. Model files come from Hugging Face the first time you download them. Your messages and voice are never sent anywhere.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+const LIB_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
+const TF_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+const STT_MODELS = { fast: 'Xenova/whisper-tiny.en', accurate: 'Xenova/whisper-base.en' };
+
+// Hand-picked models that suit a phone. Missing ones are skipped automatically.
+const CURATED = [
+  { group: 'small', id: 'SmolLM2-360M-Instruct-q4f16_1-MLC', name: 'SmolLM2 360M', note: 'Tiniest and fastest. Fine for simple questions.' },
+  { group: 'small', id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 0.5B', note: 'Good first pick. Should work on most iPhones.', tag: 'Start here' },
+  { group: 'small', id: 'Qwen3-0.6B-q4f16_1-MLC', name: 'Qwen 3 0.6B', note: 'Small but clever for its size.' },
+  { group: 'small', id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 1B', note: 'Noticeably smarter, with friendly writing.' },
+  { group: 'large', id: 'Qwen3-1.7B-q4f16_1-MLC', name: 'Qwen 3 1.7B', note: 'A real step up. The lightest of the smart ones.' },
+  { group: 'large', id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 1.5B', note: 'Solid all-rounder.' },
+  { group: 'large', id: 'gemma-2-2b-it-q4f16_1-MLC-1k', name: 'Gemma 2 2B', note: 'Good conversation. Remembers less of the chat.' },
+  { group: 'large', id: 'Hermes-3-Llama-3.2-3B-q4f16_1-MLC', name: 'Hermes 3 3B', note: 'Built to follow a persona and stay in character.', tag: 'Best for personality' },
+  { group: 'large', id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 3B', note: 'Natural, warm writing.' },
+  { group: 'large', id: 'Qwen2.5-3B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 3B', note: 'Strong at facts and step-by-step answers.' },
+  { group: 'large', id: 'Phi-3.5-mini-instruct-q4f16_1-MLC-1k', name: 'Phi 3.5 mini', note: 'Good at reasoning. Remembers less of the chat.' },
+  { group: 'large', id: 'Qwen3-4B-q4f16_1-MLC', name: 'Qwen 3 4B', note: 'The smartest here. Newest Pro iPhones only, and it may crash.' },
+];
+const GROUPS = {
+  small: { title: 'Runs on most iPhones', text: 'Under 1.5 GB of memory. Quick to download and fast to reply.' },
+  large: { title: 'Smarter, for recent Pro iPhones', text: 'These need 2 to 3 GB of free memory, which usually means an iPhone 15 Pro or newer. If the app restarts while loading one, pick a smaller model.' },
+};
+
+const PRESETS = {
+  helpful: { label: 'Helpful', name: '', desc: 'You are a helpful, friendly assistant. You answer clearly and get to the point.', lines: '' },
+  warm: { label: 'Warm', name: 'Mira', desc: 'You are Mira, a warm and upbeat companion. You are encouraging, curious about the user’s day, and you remember what they told you earlier in the chat. You talk casually, like a close friend.', lines: 'Oh nice, how did it go?\nThat sounds rough. Want to talk it through, or do you just need to vent?' },
+  witty: { label: 'Witty', name: 'Juno', desc: 'You are Juno, quick-witted and playful. You use light teasing and dry humour, but you are never mean, and you still give real, useful answers.', lines: 'Bold plan. Slightly chaotic. I respect it.\nShort answer: yes. Long answer: also yes, but with more drama.' },
+  calm: { label: 'Calm', name: 'Sage', desc: 'You are Sage, calm and thoughtful. You speak gently, help the user slow down and think things through, and ask one question at a time.', lines: 'Let’s take that one step at a time.\nWhat feels like the hardest part right now?' },
+  direct: { label: 'Direct', name: 'Rae', desc: 'You are Rae, a straight talker. You give the answer first, skip the fluff, and tell the user honestly when something is a bad idea.', lines: 'Short version: don’t. Here’s why.\nDo the cheap option first. Upgrade later if you need to.' },
+};
+const LEGACY_DEFAULT = "You are a helpful assistant running entirely on the user's iPhone, with no internet access. Answer clearly, and keep replies short unless asked for detail.";
+const LENGTHS = { short: 256, medium: 512, long: 1024 };
+const MAX_CTX = 2048;
+const SUGGESTIONS = [
+  'Explain how a rainbow forms',
+  'Give me three quick dinner ideas with rice and eggs',
+  'Write a polite text saying I’ll be 10 minutes late',
+];
+// Apple's built-in voices that sound female, by first name.
+const FEMALE_VOICES = new Set(('samantha ava allison susan zoe victoria karen moira tessa serena kate fiona veena nicky joelle noelle martha catherine kathy vicki agnes princess flo sandy shelley grandma isha stephanie evie '
+  + 'amélie amelie audrey marie aurélie anna petra helena monica mónica paulina marisol alice federica emma kyoko yuna sara nora ellen ioana laura mariska melina milena alva klara satu tingting ting-ting meijia mei-jia sinji sin-ji lekha zuzana carmit damayanti kanya lana lesya luciana joana yelda zosia ewa amira mariam soumya geeta vani kiyara').split(/\s+/));
+
+const $ = (s) => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k === 'html') n.innerHTML = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k != null) n.append(k);
+  return n;
+};
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('lai.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('lai.' + k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem('lai.' + k); } catch {} },
+};
+
+const settings = Object.assign({
+  preset: 'helpful', pName: PRESETS.helpful.name, pDesc: PRESETS.helpful.desc, pLines: PRESETS.helpful.lines,
+  temperature: 0.7, length: 'medium', showAll: false, think: false,
+  speak: true, voiceURI: '', rate: 1, pitch: 1, stt: 'fast',
+}, store.get('settings', {}));
+if (settings.system !== undefined) { // carry over a custom prompt from the first version
+  if (settings.system && settings.system !== LEGACY_DEFAULT) { settings.preset = 'custom'; settings.pDesc = settings.system; settings.pName = ''; settings.pLines = ''; }
+  delete settings.system;
+}
+const saveSettings = () => store.set('settings', settings);
+
+const state = {
+  lib: null, appConfig: null, byId: {}, hasF16: true, gpuOK: false, gpuChecked: false,
+  engine: null, loadedId: null, loadingId: null, loadSeq: 0, progress: null,
+  generating: false, cached: {},
+  messages: store.get('chat', []).filter((m) => m && m.role && typeof m.content === 'string'),
+};
+const saveChat = () => store.set('chat', state.messages.slice(-200).map(({ _spoken, ...m }) => m));
+
+/* ---------------- viewport & keyboard (iOS) ---------------- */
+function fitViewport() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  const top = vv ? vv.offsetTop : 0;
+  const root = document.documentElement;
+  root.style.setProperty('--app-h', h + 'px');
+  root.style.setProperty('--app-top', top + 'px');
+  root.classList.toggle('kb', window.innerHeight - h > 120);
+}
+window.visualViewport?.addEventListener('resize', fitViewport);
+window.visualViewport?.addEventListener('scroll', fitViewport);
+window.addEventListener('resize', fitViewport);
+
+/* ---------------- helpers ---------------- */
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+
+function prettyName(id) {
+  const c = CURATED.find((m) => m.id === id || m.id.replace('q4f16_1', 'q4f32_1') === id);
+  if (c) return c.name;
+  return id.replace(/-MLC.*$/, '').replace(/-q\d+f\d+_\d+/, '').replace(/[-_]/g, ' ');
+}
+function resolveId(id) {
+  if (!state.hasF16) {
+    const alt = id.replace('q4f16_1', 'q4f32_1');
+    if (state.byId[alt]) return alt;
+  }
+  return id;
+}
+function ctxFor(id) {
+  const o = state.byId[id]?.overrides?.context_window_size;
+  return Math.min(MAX_CTX, o && o > 0 ? o : MAX_CTX);
+}
+const maxTokens = () => Math.min(LENGTHS[settings.length] || 512, Math.floor(ctxFor(state.loadedId) / 2));
+function memLabel(rec) {
+  const mb = rec?.vram_required_MB;
+  if (!mb) return '';
+  return mb < 1000 ? `Needs about ${Math.round(mb / 50) * 50} MB of memory` : `Needs about ${(mb / 1024).toFixed(1)} GB of memory`;
+}
+function stripThink(s) { return s.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim(); }
+function splitThink(s) {
+  const i = s.indexOf('<think>');
+  if (i === -1) return { think: null, answer: s, thinking: false };
+  const j = s.indexOf('</think>', i);
+  if (j === -1) return { think: s.slice(i + 7).trim(), answer: s.slice(0, i), thinking: true };
+  return { think: s.slice(i + 7, j).trim(), answer: (s.slice(0, i) + s.slice(j + 8)).trim(), thinking: false };
+}
+const personaName = () => (settings.pName || '').trim();
+
+/* ---------------- tiny, safe markdown ---------------- */
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function inline(s) {
+  const codes = [];
+  s = s.replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
+  s = esc(s);
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>');
+  s = s.replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
+  s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s = s.replace(/\u0000(\d+)\u0000/g, (_, i) => '<code>' + esc(codes[+i]) + '</code>');
+  return s;
+}
+function blocks(src) {
+  const lines = src.split('\n');
+  let out = '', para = [], list = null;
+  const flushPara = () => { if (para.length) { out += '<p>' + para.map(inline).join('<br>') + '</p>'; para = []; } };
+  const flushList = () => { if (list) { out += `<${list.type}>` + list.items.map((i) => '<li>' + inline(i) + '</li>').join('') + `</${list.type}>`; list = null; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    let m;
+    if (!line.trim()) { flushPara(); flushList(); continue; }
+    if ((m = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/))) { flushPara(); flushList(); const lv = Math.min(4, m[1].length + 1); out += `<h${lv}>${inline(m[2])}</h${lv}>`; continue; }
+    if ((m = line.match(/^\s*[-*•+]\s+(.*)$/))) { flushPara(); if (!list || list.type !== 'ul') { flushList(); list = { type: 'ul', items: [] }; } list.items.push(m[1]); continue; }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { flushPara(); if (!list || list.type !== 'ol') { flushList(); list = { type: 'ol', items: [] }; } list.items.push(m[1]); continue; }
+    if ((m = line.match(/^\s*>\s?(.*)$/))) { flushPara(); flushList(); out += '<blockquote>' + inline(m[1]) + '</blockquote>'; continue; }
+    if (list && /^\s{2,}\S/.test(raw)) { list.items[list.items.length - 1] += ' ' + line.trim(); continue; }
+    flushList(); para.push(line);
+  }
+  flushPara(); flushList();
+  return out;
+}
+function markdown(src) {
+  return src.split('```').map((p, i) => {
+    if (i % 2 === 1) {
+      const nl = p.indexOf('\n');
+      const code = nl >= 0 ? p.slice(nl + 1) : p;
+      return '<pre><code>' + esc(code.replace(/\n$/, '')) + '</code></pre>';
+    }
+    return blocks(p);
+  }).join('');
+}
+
+/* ---------------- notices ---------------- */
+const notices = new Map();
+function setNotice(key, node) {
+  const old = notices.get(key);
+  if (old) old.remove();
+  notices.delete(key);
+  if (node) { notices.set(key, node); $('#notices').append(node); }
+}
+function noticeEl({ kind = '', title, text, actions = [], details, progress }) {
+  return el('div', { class: 'notice ' + kind, role: progress != null ? 'status' : null },
+    title ? el('h3', { text: title }) : null,
+    progress != null ? el('div', { class: 'track', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(progress * 100), 'aria-label': title || 'Progress' },
+      el('div', { class: 'fill', style: `width:${Math.round(progress * 100)}%` })) : null,
+    text ? el('p', { text }) : null,
+    details ? el('details', {}, el('summary', { text: 'Technical details' }), el('pre', { text: details })) : null,
+    actions.length ? el('div', { class: 'row' }, actions.map((a) => el('button', { class: 'btn ' + (a.kind || ''), type: 'button', text: a.label, onclick: a.onClick }))) : null,
+  );
+}
+let flashTimer = 0;
+function flash(text, ms = 4500) {
+  clearTimeout(flashTimer);
+  setNotice('flash', noticeEl({ text }));
+  flashTimer = setTimeout(() => setNotice('flash', null), ms);
+}
+
+/* ---------------- speaking (text to speech) ---------------- */
+const tts = { ok: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window, live: new Set(), unlocked: false, voices: [] };
+const voiceBase = (v) => v.name.toLowerCase().split(/[\s(]/)[0];
+const isFemale = (v) => FEMALE_VOICES.has(voiceBase(v));
+const quality = (v) => /premium/i.test(v.name + ' ' + v.voiceURI) ? 3 : /enhanced/i.test(v.name + ' ' + v.voiceURI) ? 2 : 1;
+const lang0 = (navigator.language || 'en-US').toLowerCase();
+const langScore = (v) => { const l = (v.lang || '').toLowerCase().replace('_', '-'); return l === lang0 ? 2 : l.split('-')[0] === lang0.split('-')[0] ? 1 : 0; };
+const novelty = /^(albert|bad|bahh|bells|boing|bubbles|cellos|good|jester|junior|organ|ralph|superstar|trinoids|whisper|wobble|zarvox|fred|eddy|reed|rocko|grandpa)$/;
+function loadVoices() {
+  if (!tts.ok) return;
+  const all = speechSynthesis.getVoices() || [];
+  tts.voices = all.filter((v) => !novelty.test(voiceBase(v)));
+  fillVoiceSelect();
+}
+function rankedFemale() {
+  return tts.voices.filter(isFemale).sort((a, b) => (langScore(b) - langScore(a)) || (quality(b) - quality(a)) || (voiceBase(a) === 'samantha' ? -1 : voiceBase(b) === 'samantha' ? 1 : 0) || a.name.localeCompare(b.name));
+}
+function currentVoice() {
+  if (!tts.voices.length) return null;
+  const chosen = tts.voices.find((v) => v.voiceURI === settings.voiceURI);
+  if (chosen) return chosen;
+  return rankedFemale()[0] || tts.voices.find((v) => langScore(v) === 2) || null;
+}
+function speakable(s) {
+  return s.replace(/```[\s\S]*?(```|$)/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/https?:\/\/\S+/g, 'a link')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*•+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/[*_~#|]+/g, '')
+    .replace(/\p{Extended_Pictographic}️?/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function unlockTTS() {
+  if (!tts.ok || tts.unlocked) return;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); tts.unlocked = true; } catch {}
+}
+function speakText(text) {
+  if (!tts.ok) return;
+  const t = speakable(text);
+  if (!t) return;
+  const u = new SpeechSynthesisUtterance(t);
+  const v = currentVoice();
+  if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = settings.rate;
+  u.pitch = settings.pitch;
+  const done = () => { tts.live.delete(u); updateSpeakBtn(); };
+  u.onend = done;
+  u.onerror = done;
+  tts.live.add(u);
+  try { speechSynthesis.speak(u); } catch { done(); }
+  updateSpeakBtn();
+}
+function stopSpeaking() {
+  if (!tts.ok) return;
+  tts.live.clear();
+  try { speechSynthesis.cancel(); } catch {}
+  updateSpeakBtn();
+}
+// Speak a streaming reply sentence by sentence, so it starts talking straight away.
+function feedSpeech(reply, final) {
+  const { answer, thinking } = splitThink(reply.content);
+  if (thinking) return;
+  const start = reply._spoken || 0;
+  let end;
+  if (final) end = answer.length;
+  else {
+    const re = /(?<!\d)[.!?…:;](?=\s)|\n/g;
+    re.lastIndex = start;
+    let m, last = -1;
+    while ((m = re.exec(answer))) last = m.index + m[0].length;
+    if (last <= start) return;
+    if ((answer.slice(0, last).match(/```/g) || []).length % 2) return; // inside a code block
+    if (last - start < 16) return; // wait for a fuller phrase
+    end = last;
+  }
+  const chunk = answer.slice(start, end);
+  reply._spoken = end;
+  speakText(chunk);
+}
+function updateSpeakBtn() {
+  const b = $('#speakBtn');
+  const speaking = tts.live.size > 0;
+  b.classList.toggle('speaking', speaking);
+  b.setAttribute('aria-pressed', String(!!settings.speak));
+  b.setAttribute('aria-label', speaking ? 'Stop speaking' : settings.speak ? 'Speak replies: on' : 'Speak replies: off');
+  if (!tts.ok) b.hidden = true;
+}
+if (tts.ok) {
+  loadVoices();
+  speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+  setTimeout(loadVoices, 600);
+}
+
+/* ---------------- listening (speech to text, on device) ---------------- */
+const stt = { state: 'idle', asr: null, asrKey: null, loading: null, loadingKey: null, rec: null, stream: null, ctx: null, chunks: [], timer: 0, cancel: false };
+function setMic(s, text) {
+  stt.state = s;
+  $('#field').dataset.mic = s;
+  const mic = $('#mic');
+  mic.setAttribute('aria-label', s === 'listening' ? 'Stop and send' : 'Talk');
+  mic.disabled = s === 'starting' || s === 'transcribing';
+  if (text) $('#voiceText').textContent = text;
+  updateChrome();
+}
+function showLevel(level) {
+  const bars = document.querySelectorAll('.meter i');
+  const shape = [0.55, 0.85, 1, 0.8, 0.5];
+  bars.forEach((b, i) => { b.style.transform = `scaleY(${Math.max(0.15, Math.min(1, level * shape[i] * (0.8 + Math.random() * 0.4)))})`; });
+}
+function ensureASR() {
+  const key = STT_MODELS[settings.stt] || STT_MODELS.fast;
+  if (stt.asr && stt.asrKey === key) return Promise.resolve(stt.asr);
+  if (stt.loading && stt.loadingKey === key) return stt.loading;
+  stt.loadingKey = key;
+  const files = {};
+  stt.loading = (async () => {
+    const tf = await import(TF_URL);
+    tf.env.allowLocalModels = false;
+    const asr = await tf.pipeline('automatic-speech-recognition', key, {
+      device: 'wasm',
+      dtype: { encoder_model: 'fp32', decoder_model_merged: 'q8' },
+      progress_callback: (p) => {
+        if (p?.status !== 'progress' || !p.total) return;
+        files[p.file] = [p.loaded || 0, p.total];
+        let L = 0, T = 0;
+        for (const [l, t] of Object.values(files)) { L += l; T += t; }
+        if (T > 2e6 && L < T) {
+          setNotice('stt', noticeEl({ kind: 'warn', title: 'Setting up voice input', progress: L / T, text: `Downloading the speech model once: ${Math.round(L / 1e6)} of ${Math.round(T / 1e6)} MB.` }));
+        }
+      },
+    });
+    stt.asr = asr;
+    stt.asrKey = key;
+    setNotice('stt', null);
+    return asr;
+  })();
+  stt.loading.catch(() => { stt.loading = null; setNotice('stt', null); });
+  return stt.loading;
+}
+function cleanTranscript(t) {
+  return String(t || '')
+    .replace(/\[[^\]]*\]|\([^)]*\)/g, ' ') // [BLANK_AUDIO], (music) etc.
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function micHelp(title, text, details) {
+  setNotice('mic', noticeEl({
+    kind: 'bad', title, text, details,
+    actions: [{ label: 'OK', onClick: () => setNotice('mic', null) }],
+  }));
+}
+const DICTATION_TIP = 'You can still talk to it with the microphone key on the iPhone keyboard, which also turns speech into text on the phone.';
+
+async function micTap() {
+  if (stt.state === 'listening') { finishRecording(false); return; }
+  if (stt.state !== 'idle') return;
+  setNotice('mic', null);
+  if (state.generating) stopGenerating();
+  stopSpeaking();
+  unlockTTS();
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    micHelp('This browser can’t record audio', DICTATION_TIP);
+    return;
+  }
+  let ctx = null;
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume?.(); } catch {}
+  setMic('starting', 'Starting the microphone…');
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  } catch (e) {
+    try { ctx?.close(); } catch {}
+    setMic('idle');
+    const denied = /notallowed|permission|denied/i.test(e?.name + ' ' + e?.message);
+    micHelp(denied ? 'The microphone is blocked' : 'Couldn’t start the microphone',
+      denied ? 'Allow microphone access when the app asks. If you said no before, close the app completely and open it again. ' + DICTATION_TIP : DICTATION_TIP,
+      String(e?.message || e));
+    return;
+  }
+  ensureASR().catch(() => {});
+  const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported?.(t)) || '';
+  let rec;
+  try { rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
+  catch { rec = new MediaRecorder(stream); }
+  stt.chunks = [];
+  stt.cancel = false;
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) stt.chunks.push(e.data); };
+  rec.onstop = () => onRecorded(rec.mimeType || mime);
+  rec.start(250);
+  stt.rec = rec; stt.stream = stream; stt.ctx = ctx;
+
+  // Level meter and "stop when you stop talking".
+  let analyser = null;
+  try {
+    if (ctx) {
+      const src = ctx.createMediaStreamSource(stream);
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+    }
+  } catch { analyser = null; }
+  const buf = new Float32Array(1024);
+  const t0 = performance.now();
+  let heard = false, lastVoice = 0, sawSignal = false;
+  const floorSamples = [];
+  stt.timer = setInterval(() => {
+    const t = performance.now() - t0;
+    let rms = 0;
+    if (analyser) {
+      analyser.getFloatTimeDomainData(buf);
+      let s = 0;
+      for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+      rms = Math.sqrt(s / buf.length);
+    }
+    if (rms > 0) sawSignal = true;
+    if (t < 400) floorSamples.push(rms);
+    const floor = Math.min(0.03, floorSamples.reduce((a, b) => a + b, 0) / Math.max(1, floorSamples.length));
+    const thr = Math.max(0.012, floor * 2.5);
+    if (rms > thr && t > 150) { heard = true; lastVoice = t; }
+    showLevel(rms / (thr * 3));
+    const vad = sawSignal || t < 1200; // if the meter never moves, rely on the user tapping to stop
+    if (t > 30000) finishRecording(false);
+    else if (vad && heard && t - lastVoice > 1300) finishRecording(false);
+    else if (vad && sawSignal && !heard && t > 8000) finishRecording(true);
+  }, 80);
+  setMic('listening', 'Listening… stops when you pause');
+}
+
+function finishRecording(nothingHeard) {
+  if (stt.state !== 'listening') return;
+  clearInterval(stt.timer);
+  stt.cancel = nothingHeard;
+  setMic('transcribing', 'Writing down what you said…');
+  try { if (stt.rec && stt.rec.state !== 'inactive') stt.rec.stop(); else onRecorded(''); }
+  catch { onRecorded(''); }
+}
+
+async function decodeTo16k(blob, ctx) {
+  const data = await blob.arrayBuffer();
+  const ac = ctx && ctx.state !== 'closed' ? ctx : new (window.AudioContext || window.webkitAudioContext)();
+  const decoded = await new Promise((res, rej) => {
+    const p = ac.decodeAudioData(data, res, rej);
+    if (p && p.then) p.then(res, rej);
+  });
+  const len = Math.max(1, Math.ceil(decoded.duration * 16000));
+  const off = new OfflineAudioContext(1, len, 16000);
+  const src = off.createBufferSource();
+  src.buffer = decoded;
+  src.connect(off.destination);
+  src.start();
+  const rendered = await off.startRendering();
+  if (ac !== ctx) try { ac.close(); } catch {}
+  return rendered.getChannelData(0);
+}
+
+async function onRecorded(mime) {
+  stt.stream?.getTracks().forEach((t) => t.stop());
+  stt.stream = null;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+  const chunks = stt.chunks;
+  stt.chunks = [];
+  const ctx = stt.ctx;
+  stt.ctx = null;
+  if (stt.cancel) {
+    try { ctx?.close(); } catch {}
+    setMic('idle');
+    flash('Didn’t hear anything. Tap the microphone and try again.');
+    return;
+  }
+  try {
+    if (!chunks.length) throw new Error('No audio was recorded');
+    const blob = new Blob(chunks, { type: mime || chunks[0].type || 'audio/mp4' });
+    const audio = await decodeTo16k(blob, ctx);
+    try { ctx?.close(); } catch {}
+    if (audio.length < 16000 * 0.3) throw new Error('Recording too short');
+    if (!stt.asr) $('#voiceText').textContent = 'Setting up voice input…';
+    const asr = await ensureASR();
+    $('#voiceText').textContent = 'Writing down what you said…';
+    const out = await asr(audio);
+    const text = cleanTranscript(Array.isArray(out) ? out[0]?.text : out?.text);
+    setMic('idle');
+    if (!text) { flash('Didn’t catch that. Try again a little closer to the phone.'); return; }
+    sendFromVoice(text);
+  } catch (e) {
+    console.error(e);
+    try { ctx?.close(); } catch {}
+    setMic('idle');
+    const m = String(e?.message || e);
+    if (/too short/i.test(m)) { flash('That was too short. Tap the microphone, speak, then tap the red button.'); return; }
+    micHelp('Voice input didn’t work', (/fetch|network|load|import/i.test(m) ? 'The speech model couldn’t download. Connect to the internet once so it can be saved. ' : '') + DICTATION_TIP, m);
+  }
+}
+
+function sendFromVoice(text) {
+  if (!state.loadedId) {
+    input.value = text; autoGrow(); updateChrome();
+    if (!state.loadingId) openSheet('sheetModels');
+    return;
+  }
+  send(text, { voice: true });
+}
+
+/* ---------------- header chip & composer ---------------- */
+function updateChrome() {
+  const app = $('#app');
+  const chip = $('#chip');
+  let st = 'none', label = 'Choose a model', p = 0;
+  if (state.loadingId) {
+    st = 'loading';
+    p = Math.round((state.progress?.value || 0) * 100);
+    label = `${prettyName(state.loadingId)} ${p}%`;
+  } else if (state.loadedId) {
+    st = state.generating ? 'busy' : 'ready';
+    label = prettyName(state.loadedId);
+  } else if (!state.gpuOK && state.gpuChecked) {
+    st = 'error'; label = 'Not supported here';
+  }
+  app.dataset.state = st;
+  chip.style.setProperty('--p', st === 'loading' ? p : 0);
+  $('#chipLabel').textContent = label;
+  chip.setAttribute('aria-label', st === 'ready' || st === 'busy' ? `Model: ${label}. Change model` : label);
+
+  const name = personaName();
+  input.placeholder = state.loadedId ? (name ? `Message ${name}` : 'Message') : state.loadingId ? 'Getting the model ready…' : 'Choose a model to start';
+  const send = $('#send');
+  if (state.generating) {
+    send.disabled = false;
+    send.classList.add('stop');
+    send.setAttribute('aria-label', 'Stop');
+    $('#sendIcon').innerHTML = '<rect x="4.5" y="4.5" width="9" height="9" rx="2" fill="currentColor"/>';
+  } else {
+    send.classList.remove('stop');
+    send.setAttribute('aria-label', 'Send');
+    $('#sendIcon').innerHTML = '<path d="M9 14.5V3.5M4 8.5 9 3.5l5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+    send.disabled = stt.state !== 'idle' || !input.value.trim() || !!state.loadingId;
+  }
+  updateSpeakBtn();
+}
+
+/* ---------------- thread rendering ---------------- */
+const scroller = $('#scroll');
+let stick = true;
+scroller.addEventListener('scroll', () => {
+  stick = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 80;
+}, { passive: true });
+const toEnd = (force) => { if (force || stick) scroller.scrollTop = scroller.scrollHeight; };
+
+function heroEl() {
+  if (state.loadedId || state.loadingId) {
+    const name = personaName();
+    return el('div', { class: 'ready-state' },
+      el('h2', { text: state.loadedId ? (name ? `Say hi to ${name}` : 'Ask anything') : 'Almost ready' }),
+      el('p', { text: state.loadedId ? 'Type, or tap the microphone and talk. Everything is worked out on this iPhone.' : 'The download only happens once. Next time the model opens in seconds.' }),
+      el('div', { class: 'suggestions' }, SUGGESTIONS.map((s) => el('button', { type: 'button', text: s, onclick: () => { input.value = s; autoGrow(); updateChrome(); input.focus(); } }))),
+    );
+  }
+  return el('div', { class: 'hero' },
+    el('h1', { text: 'An AI that lives on this iPhone' }),
+    el('p', { text: 'Pick a model and download it once. After that, every reply is worked out on your phone, and you can talk to it out loud.' }),
+    el('ul', { class: 'facts' },
+      el('li', {}, el('span', {}, el('b', { text: 'Private. ' }), 'What you type or say never leaves the phone.')),
+      el('li', {}, el('span', {}, el('b', { text: 'Offline. ' }), 'Works in airplane mode once a model is saved.')),
+      el('li', {}, el('span', {}, el('b', { text: 'Yours. ' }), 'Give it a name, a personality and a voice.')),
+    ),
+    state.gpuOK ? el('button', { class: 'btn primary', type: 'button', text: 'Choose a model', onclick: () => openSheet('sheetModels') }) : null,
+  );
+}
+
+function renderThread() {
+  const t = $('#thread');
+  t.replaceChildren();
+  if (!state.messages.length) { t.append(heroEl()); return; }
+  for (const m of state.messages) t.append(messageEl(m));
+}
+
+function messageEl(m) {
+  if (m.role === 'user') {
+    return el('div', { class: 'msg user' }, el('div', { class: 'bubble', text: m.content }), m.voice ? el('div', { class: 'via', text: 'Said out loud' }) : null);
+  }
+  const node = el('div', { class: 'msg ai' });
+  fillAssistant(node, m);
+  return node;
+}
+
+function fillAssistant(node, m) {
+  const { think, answer, thinking } = splitThink(m.content);
+  const kids = [];
+  if (think !== null && (thinking || think)) {
+    const d = el('details', { class: 'think' }, el('summary', { text: thinking ? 'Thinking…' : 'Show its thinking' }), el('div', { text: think }));
+    if (thinking) d.open = true;
+    kids.push(d);
+  }
+  if (answer.trim()) kids.push(el('div', { class: 'prose', html: markdown(answer) }));
+  else if (!m.done && !thinking) kids.push(el('div', { class: 'waiting', 'aria-label': 'Writing a reply' }, el('i'), el('i'), el('i')));
+  if (m.error) kids.push(el('div', { class: 'msg-error', text: m.error }));
+  if (m.done) {
+    const actions = el('div', { class: 'msg-actions' });
+    if (answer.trim()) {
+      const copy = el('button', { type: 'button', text: 'Copy' });
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(answer.trim()); copy.textContent = 'Copied'; }
+        catch { copy.textContent = 'Couldn’t copy'; }
+        setTimeout(() => (copy.textContent = 'Copy'), 1600);
+      });
+      actions.append(copy);
+      if (tts.ok) actions.append(el('button', { type: 'button', text: 'Read aloud', onclick: () => { stopSpeaking(); unlockTTS(); speakText(answer); } }));
+    }
+    const isLast = state.messages[state.messages.length - 1] === m;
+    if (isLast && state.loadedId) actions.append(el('button', { type: 'button', text: 'Try again', onclick: retryLast }));
+    if (m.stopped) actions.append(el('span', { class: 'speed', text: 'Stopped' }));
+    else if (m.speed) actions.append(el('span', { class: 'speed', text: `${m.speed} tokens/sec` }));
+    if (actions.childNodes.length) kids.push(actions);
+  }
+  node.replaceChildren(...kids);
+}
+
+/* ---------------- sheets ---------------- */
+let lastFocus = null;
+function openSheet(id) {
+  lastFocus = document.activeElement;
+  const s = document.getElementById(id);
+  if (id === 'sheetModels') renderModels();
+  if (id === 'sheetSettings') { loadVoices(); fillSettings(); }
+  s.classList.add('open');
+  setTimeout(() => s.querySelector('h2').focus({ preventScroll: true }), 30);
+}
+function closeSheet(s) {
+  s.classList.remove('open');
+  lastFocus?.focus?.({ preventScroll: true });
+}
+document.querySelectorAll('.sheet').forEach((s) => {
+  s.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeSheet(s); });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.querySelectorAll('.sheet.open').forEach(closeSheet);
+});
+
+/* ---------------- models sheet ---------------- */
+function modelEntries() {
+  if (!state.appConfig) return [];
+  const out = [];
+  const seen = new Set();
+  for (const c of CURATED) {
+    const id = resolveId(c.id);
+    if (!state.byId[id] || seen.has(id)) continue;
+    out.push({ ...c, id });
+    seen.add(id);
+  }
+  if (settings.showAll) {
+    for (const m of state.appConfig.model_list) {
+      const id = m.model_id;
+      if (seen.has(id)) continue;
+      if (m.model_type === 1 || m.model_type === 2 || /embed/i.test(id)) continue;
+      if (!state.hasF16 && /f16/.test(id)) continue;
+      out.push({ group: 'other', id, name: id.replace(/-MLC.*$/, '').replace(/[-_]/g, ' '), note: '' });
+      seen.add(id);
+    }
+  }
+  return out;
+}
+
+async function refreshCached(ids) {
+  if (!state.lib?.hasModelInCache) return;
+  ids = ids || modelEntries().map((m) => m.id);
+  await Promise.all(ids.map(async (id) => {
+    try { state.cached[id] = await state.lib.hasModelInCache(id, state.appConfig); } catch { state.cached[id] = false; }
+  }));
+}
+
+function modelRow(m) {
+  const rec = state.byId[m.id];
+  const isOn = state.loadedId === m.id;
+  const isLoading = state.loadingId === m.id;
+  const saved = !!state.cached[m.id];
+  let status = 'Download', cls = '';
+  if (isLoading) { status = 'Loading…'; cls = 'on'; }
+  else if (isOn) { status = 'In use'; cls = 'on'; }
+  else if (saved) { status = 'On this iPhone'; cls = 'saved'; }
+
+  const main = el('button', { class: 'model-main', type: 'button', onclick: () => { closeSheet($('#sheetModels')); if (!isOn && !isLoading) loadModel(m.id); } },
+    el('span', { class: 'model-name' }, m.name, m.tag ? el('span', { class: 'model-tag', text: m.tag }) : null),
+    m.note ? el('span', { class: 'model-note', text: m.note }) : null,
+    el('span', { class: 'model-meta', text: memLabel(rec) }),
+  );
+  const side = el('div', { class: 'model-side' }, el('span', { class: 'model-status ' + cls, text: status }));
+  if (saved && !isLoading) {
+    const del = el('button', { class: 'model-del', type: 'button', text: 'Delete' });
+    let armed = false, timer;
+    del.addEventListener('click', async () => {
+      if (!armed) { armed = true; del.textContent = 'Tap to confirm'; timer = setTimeout(() => { armed = false; del.textContent = 'Delete'; }, 3000); return; }
+      clearTimeout(timer);
+      del.disabled = true; del.textContent = 'Deleting…';
+      await deleteModel(m.id);
+      renderModels();
+    });
+    side.append(del);
+  }
+  return el('div', { class: 'model' }, main, side);
+}
+
+function renderModels() {
+  const list = $('#modelList');
+  list.replaceChildren();
+  if (!state.appConfig) {
+    list.append(el('p', { class: 'lead', text: state.gpuOK ? 'Starting the AI engine…' : 'This browser can’t run models. See the message on the main screen.' }));
+    return;
+  }
+  const entries = modelEntries();
+  const groups = [['small', GROUPS.small], ['large', GROUPS.large], ['other', { title: 'Every other model', text: 'Most of these are too big for a phone.' }]];
+  for (const [key, g] of groups) {
+    const rows = entries.filter((m) => m.group === key);
+    if (!rows.length) continue;
+    list.append(el('div', { class: 'group-head' }, el('h3', { text: g.title }), el('p', { text: g.text })));
+    list.append(el('div', { class: 'models' }, rows.map(modelRow)));
+  }
+  showStorage();
+}
+
+async function showStorage() {
+  const box = $('#storageInfo');
+  try {
+    const est = await navigator.storage?.estimate?.();
+    if (!est) { box.textContent = ''; return; }
+    const gb = (n) => (n / 1024 ** 3).toFixed(n > 1024 ** 3 * 10 ? 0 : 1) + ' GB';
+    box.textContent = `This app is using ${gb(est.usage || 0)} of storage.`;
+  } catch { box.textContent = ''; }
+}
+
+$('#showAll').addEventListener('change', async (e) => {
+  settings.showAll = e.target.checked; saveSettings();
+  renderModels();
+  await refreshCached();
+  renderModels();
+});
+
+async function deleteModel(id) {
+  if (state.loadedId === id) {
+    try { await state.engine?.unload(); } catch {}
+    state.loadedId = null;
+    store.del('model');
+  }
+  try { await state.lib.deleteModelAllInfoInCache(id, state.appConfig); } catch (e) { console.warn(e); }
+  state.cached[id] = false;
+  await refreshCached();
+  updateChrome();
+  renderThread();
+}
+
+/* ---------------- loading a model ---------------- */
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => (wakeLock = null));
+    } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.loadingId) keepAwake(true);
+  if (document.hidden && stt.state === 'listening') finishRecording(false);
+});
+
+function progressNotice() {
+  const p = state.progress;
+  if (!p) return null;
+  const name = prettyName(p.id);
+  let title, text;
+  if (p.phase === 'download') {
+    title = `Downloading ${name}`;
+    text = `${p.mb ? p.mb + ' MB so far. ' : ''}Keep this screen open. This only happens once.`;
+  } else if (p.phase === 'storage') {
+    title = `Loading ${name}`;
+    text = 'Reading the saved model from this iPhone.';
+  } else {
+    title = `Getting ${name} ready`;
+    text = 'Setting up the graphics chip. The first time can take a minute.';
+  }
+  return noticeEl({ kind: 'warn', title, text, progress: p.value || 0, actions: [{ label: 'Cancel', onClick: cancelLoad }] });
+}
+let progressFrame = 0;
+function onProgress(seq, r) {
+  if (seq !== state.loadSeq || !state.progress) return;
+  const t = String(r?.text || '');
+  let phase = state.progress.phase;
+  if (/fetch/i.test(t)) phase = 'download';
+  else if (/from cache/i.test(t)) phase = 'storage';
+  else if (/shader|compil|webgpu|finish/i.test(t)) phase = 'prepare';
+  const mb = (t.match(/(\d+(?:\.\d+)?)\s*MB/i) || [])[1];
+  state.progress = { ...state.progress, phase, value: typeof r?.progress === 'number' ? r.progress : state.progress.value, mb: mb ? Math.round(+mb) : state.progress.mb };
+  if (!progressFrame) progressFrame = requestAnimationFrame(() => {
+    progressFrame = 0;
+    if (state.progress) setNotice('progress', progressNotice());
+    updateChrome();
+  });
+}
+
+function explainLoadError(err) {
+  const m = String(err?.message || err || '');
+  if (/quota|storage|disk|space/i.test(m)) return 'There isn’t enough free storage for this model. Free up space on the iPhone or pick a smaller model.';
+  if (/f16|shader-f16/i.test(m)) return 'This iPhone’s graphics chip can’t run this version of the model. Try a different one.';
+  if (/memory|allocat|out of|buffer|lost/i.test(m)) return 'This model needs more memory than the iPhone could spare. Pick a smaller model, or close other apps and try again.';
+  if (/load failed|network|fetch|offline|internet/i.test(m)) return 'The download stopped. If you’re online, tap Try again and it picks up where it left off. If it keeps failing, this model may be too big for this iPhone.';
+  return 'Something went wrong while setting up the model. Try again, or pick a smaller model.';
+}
+
+async function loadModel(id) {
+  if (!state.lib) return;
+  if (state.generating) stopGenerating();
+  const seq = ++state.loadSeq;
+  state.loadingId = id;
+  state.loadedId = null;
+  state.progress = { id, phase: state.cached[id] ? 'storage' : 'download', value: 0, mb: 0 };
+  setNotice('loadError', null);
+  setNotice('crash', null);
+  setNotice('progress', progressNotice());
+  store.set('pending', { phase: 'loading', id, at: Date.now() });
+  updateChrome();
+  renderThread();
+  keepAwake(true);
+  try {
+    if (!state.engine) {
+      state.engine = new state.lib.MLCEngine({ appConfig: state.appConfig, initProgressCallback: (r) => onProgress(seq, r) });
+    } else {
+      state.engine.setInitProgressCallback((r) => onProgress(seq, r));
+    }
+    await state.engine.reload(id, { context_window_size: ctxFor(id) });
+    if (seq !== state.loadSeq) return;
+    state.loadedId = id;
+    state.cached[id] = true;
+    store.set('model', id);
+    try { await navigator.storage?.persist?.(); } catch {}
+  } catch (err) {
+    if (seq !== state.loadSeq) return;
+    console.error(err);
+    setNotice('loadError', noticeEl({
+      kind: 'bad',
+      title: `Couldn’t load ${prettyName(id)}`,
+      text: explainLoadError(err),
+      details: String(err?.message || err),
+      actions: [
+        { label: 'Try again', kind: 'primary', onClick: () => loadModel(id) },
+        { label: 'Pick another model', onClick: () => openSheet('sheetModels') },
+      ],
+    }));
+    refreshCached([id]);
+  } finally {
+    if (seq === state.loadSeq) {
+      state.loadingId = null;
+      state.progress = null;
+      store.del('pending');
+      setNotice('progress', null);
+      keepAwake(false);
+      updateChrome();
+      renderThread();
+      toEnd(true);
+    }
+  }
+}
+
+async function cancelLoad() {
+  state.loadSeq++;
+  state.loadingId = null;
+  state.progress = null;
+  store.del('pending');
+  setNotice('progress', null);
+  keepAwake(false);
+  try { await state.engine?.unload(); } catch {}
+  state.loadedId = null;
+  updateChrome();
+  renderThread();
+  refreshCached();
+}
+
+/* ---------------- chatting ---------------- */
+function systemPrompt(voiceMode) {
+  const name = personaName();
+  const parts = [];
+  const desc = (settings.pDesc || '').trim();
+  if (desc) parts.push(desc);
+  if (name && !desc.includes(name)) parts.push(`Your name is ${name}.`);
+  const lines = (settings.pLines || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 6);
+  if (lines.length) parts.push('Examples of how you talk:\n' + lines.map((l) => `- "${l.replace(/^["“]|["”]$/g, '')}"`).join('\n'));
+  parts.push('You run entirely on the user’s iPhone with no internet access, so you can’t look things up. Keep replies short and conversational unless asked for detail.');
+  if (voiceMode) parts.push('Your reply will be read aloud, so write it as natural speech: no lists, tables, code or emoji.');
+  if (name || desc) parts.push('Stay in character.');
+  let sys = parts.join('\n\n');
+  if (/^Qwen3/i.test(state.loadedId || '') && !settings.think) sys += '\n/no_think';
+  return sys;
+}
+
+function buildPrompt(voiceMode) {
+  const ctx = ctxFor(state.loadedId);
+  const sys = systemPrompt(voiceMode);
+  const budget = Math.max(300, (ctx - maxTokens() - 96) * 3.2); // rough characters that fit
+  const hist = state.messages.slice(0, -1)
+    .filter((m) => !(m.role === 'assistant' && m.error && !stripThink(m.content)))
+    .map((m) => ({ role: m.role, content: m.role === 'assistant' ? stripThink(m.content) : m.content }))
+    .filter((m) => m.content.trim());
+  let used = sys.length;
+  const out = [];
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const c = hist[i].content;
+    if (used + c.length > budget) {
+      if (!out.length) out.unshift({ ...hist[i], content: c.slice(-Math.max(200, Math.floor(budget - used))) });
+      break;
+    }
+    out.unshift(hist[i]);
+    used += c.length;
+  }
+  while (out.length && out[0].role !== 'user') out.shift();
+  const merged = [];
+  for (const m of out) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.role === m.role) prev.content += '\n\n' + m.content;
+    else merged.push({ ...m });
+  }
+  return [{ role: 'system', content: sys }, ...merged];
+}
+
+function friendlyGenError(err) {
+  const m = String(err?.message || err || '');
+  if (/context|window|too long|exceed/i.test(m)) return 'This chat got too long for the model to keep in mind. Start a new chat.';
+  if (/lost|destroyed|disposed|not loaded|reload/i.test(m)) return 'The model was unloaded, probably because the app was in the background. Tap the model name at the top to load it again.';
+  return 'The model stopped with an error: ' + m.slice(0, 160);
+}
+
+let renderFrame = 0;
+let stopRequested = false;
+async function send(text, opts = {}) {
+  text = text.trim();
+  if (!text) return;
+  if (state.generating || state.loadingId) return;
+  if (!state.loadedId) { openSheet('sheetModels'); return; }
+  stopSpeaking();
+  const speakIt = tts.ok && (settings.speak || opts.voice);
+
+  const wasEmpty = !state.messages.length;
+  state.messages.push({ role: 'user', content: text, voice: !!opts.voice });
+  const reply = { role: 'assistant', content: '', model: state.loadedId, done: false };
+  state.messages.push(reply);
+  if (wasEmpty) renderThread();
+  else {
+    const t = $('#thread');
+    const prevAi = t.querySelectorAll('.msg.ai');
+    const prevMsg = state.messages[state.messages.length - 3];
+    if (prevAi.length && prevMsg?.role === 'assistant') fillAssistant(prevAi[prevAi.length - 1], prevMsg);
+    t.append(messageEl(state.messages[state.messages.length - 2]), messageEl(reply));
+  }
+  const node = $('#thread').lastElementChild;
+  toEnd(true);
+  state.generating = true;
+  stopRequested = false;
+  updateChrome();
+  store.set('pending', { phase: 'answering', id: state.loadedId, at: Date.now() });
+
+  let usage = null;
+  try {
+    const stream = await state.engine.chat.completions.create({
+      messages: buildPrompt(speakIt),
+      stream: true,
+      temperature: settings.temperature,
+      max_tokens: maxTokens(),
+      stream_options: { include_usage: true },
+    });
+    for await (const chunk of stream) {
+      const d = chunk?.choices?.[0]?.delta?.content;
+      if (d) {
+        reply.content += d;
+        if (speakIt && !stopRequested) feedSpeech(reply, false);
+        if (!renderFrame) renderFrame = requestAnimationFrame(() => { renderFrame = 0; fillAssistant(node, reply); toEnd(); });
+      }
+      if (chunk?.usage) usage = chunk.usage;
+    }
+    const tps = usage?.extra?.decode_tokens_per_s;
+    if (tps) reply.speed = Math.round(tps * 10) / 10;
+    if (speakIt && !stopRequested) feedSpeech(reply, true);
+  } catch (err) {
+    console.error(err);
+    reply.error = friendlyGenError(err);
+    if (/lost|destroyed|disposed|not loaded/i.test(String(err?.message))) { state.loadedId = null; }
+  } finally {
+    cancelAnimationFrame(renderFrame); renderFrame = 0;
+    if (stopRequested) { reply.stopped = true; stopRequested = false; }
+    store.del('pending');
+    state.generating = false;
+    reply.done = true;
+    if (!stripThink(reply.content) && !reply.error && !reply.stopped) reply.error = 'The model returned an empty reply. Try again.';
+    saveChat();
+    fillAssistant(node, reply);
+    updateChrome();
+    toEnd();
+  }
+}
+
+function stopGenerating() {
+  stopRequested = true;
+  stopSpeaking();
+  try { state.engine?.interruptGenerate(); } catch {}
+}
+
+function retryLast() {
+  if (state.generating || !state.loadedId) return;
+  const last = state.messages[state.messages.length - 1];
+  const user = state.messages[state.messages.length - 2];
+  if (!last || last.role !== 'assistant' || !user || user.role !== 'user') return;
+  unlockTTS();
+  state.messages.splice(-2, 2);
+  renderThread();
+  send(user.content, { voice: user.voice });
+}
+
+/* ---------------- composer ---------------- */
+const input = $('#input');
+function autoGrow() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+}
+input.addEventListener('input', () => { autoGrow(); updateChrome(); });
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    $('#composer').requestSubmit();
+  }
+});
+$('#composer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (state.generating) { stopGenerating(); return; }
+  unlockTTS();
+  if (!state.loadedId) { if (!state.loadingId) openSheet('sheetModels'); return; }
+  const text = input.value;
+  if (!text.trim()) return;
+  input.value = '';
+  autoGrow();
+  send(text);
+});
+$('#mic').addEventListener('click', micTap);
+$('#chip').addEventListener('click', () => openSheet('sheetModels'));
+$('#openSettings').addEventListener('click', () => openSheet('sheetSettings'));
+$('#newChat').addEventListener('click', () => {
+  if (state.generating) stopGenerating();
+  stopSpeaking();
+  state.messages = [];
+  saveChat();
+  renderThread();
+  input.focus({ preventScroll: true });
+});
+$('#speakBtn').addEventListener('click', () => {
+  if (tts.live.size) { stopSpeaking(); return; }
+  settings.speak = !settings.speak;
+  saveSettings();
+  if (settings.speak) unlockTTS();
+  flash(settings.speak ? 'Replies will be spoken out loud.' : 'Replies won’t be spoken. Voice messages still get a spoken reply.', 2600);
+  updateSpeakBtn();
+});
+
+/* ---------------- settings sheet ---------------- */
+function fillVoiceSelect() {
+  const sel = $('#voiceSel');
+  if (!sel) return;
+  if (!tts.ok) { sel.closest('.setting').hidden = true; return; }
+  const cur = currentVoice();
+  const female = rankedFemale();
+  const others = tts.voices.filter((v) => !isFemale(v) && langScore(v) > 0).sort((a, b) => quality(b) - quality(a) || a.name.localeCompare(b.name));
+  const label = (v) => `${v.name.replace(/\s*\((Enhanced|Premium)\)/i, '')}${quality(v) === 3 ? ' (Premium)' : quality(v) === 2 ? ' (Enhanced)' : ''} – ${v.lang}`;
+  const opt = (v) => el('option', { value: v.voiceURI, selected: cur && v.voiceURI === cur.voiceURI, text: label(v) });
+  sel.replaceChildren(
+    female.length ? el('optgroup', { label: 'Female voices' }, female.map(opt)) : null,
+    others.length ? el('optgroup', { label: 'Other voices' }, others.map(opt)) : null,
+  );
+  if (!female.length && !others.length) sel.append(el('option', { value: '', text: 'Loading voices…' }));
+}
+function renderPresets() {
+  const box = $('#presets');
+  box.replaceChildren(...Object.entries(PRESETS).map(([key, p]) =>
+    el('button', { type: 'button', 'aria-pressed': String(settings.preset === key), text: p.label, onclick: () => {
+      settings.preset = key; settings.pName = p.name; settings.pDesc = p.desc; settings.pLines = p.lines;
+      saveSettings(); fillSettings(); updateChrome(); if (!state.messages.length) renderThread();
+    } })));
+}
+function fillSettings() {
+  renderPresets();
+  $('#pName').value = settings.pName || '';
+  $('#pDesc').value = settings.pDesc || '';
+  $('#pLines').value = settings.pLines || '';
+  $('#speakToggle').checked = !!settings.speak;
+  $('#rate').value = settings.rate;
+  $('#pitch').value = settings.pitch;
+  $('#temp').value = settings.temperature;
+  $('#thinkToggle').checked = !!settings.think;
+  document.querySelectorAll('#lenSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.len === settings.length)));
+  document.querySelectorAll('#sttSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.stt === settings.stt)));
+  fillVoiceSelect();
+}
+const markCustom = () => { settings.preset = 'custom'; renderPresets(); };
+$('#pName').addEventListener('input', (e) => { settings.pName = e.target.value; markCustom(); saveSettings(); updateChrome(); if (!state.messages.length) renderThread(); });
+$('#pDesc').addEventListener('input', (e) => { settings.pDesc = e.target.value; markCustom(); saveSettings(); });
+$('#pLines').addEventListener('input', (e) => { settings.pLines = e.target.value; markCustom(); saveSettings(); });
+$('#speakToggle').addEventListener('change', (e) => { settings.speak = e.target.checked; saveSettings(); if (settings.speak) unlockTTS(); else stopSpeaking(); updateSpeakBtn(); });
+$('#voiceSel').addEventListener('change', (e) => { settings.voiceURI = e.target.value; saveSettings(); stopSpeaking(); unlockTTS(); speakText(sampleLine()); });
+$('#rate').addEventListener('input', (e) => { settings.rate = +e.target.value; saveSettings(); });
+$('#pitch').addEventListener('input', (e) => { settings.pitch = +e.target.value; saveSettings(); });
+$('#testVoice').addEventListener('click', () => { stopSpeaking(); unlockTTS(); speakText(sampleLine()); });
+$('#temp').addEventListener('input', (e) => { settings.temperature = +e.target.value; saveSettings(); });
+$('#thinkToggle').addEventListener('change', (e) => { settings.think = e.target.checked; saveSettings(); });
+$('#lenSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-len]');
+  if (!b) return;
+  settings.length = b.dataset.len; saveSettings(); fillSettings();
+});
+$('#sttSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-stt]');
+  if (!b) return;
+  settings.stt = b.dataset.stt; saveSettings(); fillSettings();
+});
+function sampleLine() {
+  const name = personaName();
+  return name ? `Hi, I'm ${name}. This is how I sound.` : 'Hi there. This is how I sound.';
+}
+
+/* ---------------- start-up ---------------- */
+function registerSW() {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Offline support unavailable', e));
+  }
+}
+
+function showCrashNotice(p) {
+  const what = p.phase === 'answering' ? 'was answering with' : 'was loading';
+  setNotice('crash', noticeEl({
+    kind: 'warn',
+    title: 'The page restarted last time',
+    text: `iOS reloaded this page while it ${what} ${prettyName(p.id)}. That usually means the model needed more memory than the iPhone had free. Try a smaller model, or close other apps first.`,
+    actions: [
+      { label: 'Choose a model', kind: 'primary', onClick: () => { setNotice('crash', null); openSheet('sheetModels'); } },
+      { label: 'Dismiss', kind: 'quiet', onClick: () => setNotice('crash', null) },
+    ],
+  }));
+}
+
+function showHomeScreenTip() {
+  if (!isIOS || isStandalone() || store.get('tipDone', false)) return;
+  setNotice('tip', noticeEl({
+    title: 'Add this to your Home Screen first',
+    text: 'Tap Share, then Add to Home Screen, and download models from there. The Home Screen app keeps its own storage, so a model downloaded here in Safari won’t carry over.',
+    actions: [{ label: 'Got it', onClick: () => { store.set('tipDone', true); setNotice('tip', null); } }],
+  }));
+}
+
+async function boot() {
+  fitViewport();
+  registerSW();
+  saveSettings();
+  fillSettings();
+  $('#showAll').checked = !!settings.showAll;
+  renderThread();
+  updateChrome();
+  autoGrow();
+  toEnd(true);
+
+  const crashed = store.get('pending', null);
+  store.del('pending');
+
+  if (!('gpu' in navigator)) {
+    state.gpuChecked = true;
+    updateChrome();
+    renderThread();
+    setNotice('gpu', noticeEl({
+      kind: 'bad',
+      title: 'This browser can’t run local models',
+      text: isIOS
+        ? 'It needs WebGPU, which Safari has turned on from iOS 26. Update in Settings > General > Software Update. On iOS 18 you can try turning it on in Settings > Apps > Safari > Advanced > Feature Flags > WebGPU.'
+        : 'It needs WebGPU. Use Safari on iOS 26 or newer, or a recent Chrome or Edge.',
+    }));
+    return;
+  }
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error('No GPU adapter');
+    state.hasF16 = adapter.features.has('shader-f16');
+    state.gpuOK = true;
+  } catch (e) {
+    state.gpuChecked = true;
+    updateChrome();
+    setNotice('gpu', noticeEl({ kind: 'bad', title: 'Couldn’t reach the graphics chip', text: 'WebGPU is on, but the browser didn’t give this page access to the GPU. Close other tabs and reload.', details: String(e?.message || e), actions: [{ label: 'Reload', onClick: () => location.reload() }] }));
+    return;
+  }
+  state.gpuChecked = true;
+  renderThread();
+
+  try {
+    state.lib = await import(LIB_URL);
+  } catch (e) {
+    setNotice('lib', noticeEl({
+      kind: 'bad',
+      title: 'Couldn’t start the AI engine',
+      text: 'The engine downloads the first time you open the app. Connect to the internet once and reload; after that it works offline.',
+      details: String(e?.message || e),
+      actions: [{ label: 'Reload', kind: 'primary', onClick: () => location.reload() }],
+    }));
+    return;
+  }
+  state.appConfig = { ...state.lib.prebuiltAppConfig };
+  for (const m of state.appConfig.model_list || []) state.byId[m.model_id] = m;
+
+  const last = store.get('model', null);
+  await refreshCached(last ? [...modelEntries().map((m) => m.id), last] : undefined);
+
+  if (crashed && crashed.id) showCrashNotice(crashed);
+  else showHomeScreenTip();
+  toEnd(true);
+
+  if (last && state.byId[last] && state.cached[last] && !crashed) loadModel(last);
+  else { updateChrome(); renderThread(); }
+}
+
+boot();
+</script>
+</body>
+</html>
